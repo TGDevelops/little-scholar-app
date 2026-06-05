@@ -5,6 +5,7 @@
 //  Created by Tejesh on 26/05/26.
 //
 
+import SwiftData
 import SwiftUI
 
 @main
@@ -13,5 +14,6 @@ struct little_scholarApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: [ChildProfile.self, Exam.self, ExamResult.self])
     }
 }
