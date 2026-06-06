@@ -4,6 +4,7 @@ import SwiftData
 @Model
 final class Exam {
     var examID: UUID = UUID()
+    var parentID: String = ""
     var childProfileID: UUID = UUID()
     var childName: String = ""
     var grade: String = "Grade 1"
@@ -15,6 +16,7 @@ final class Exam {
 
     init(
         examID: UUID = UUID(),
+        parentID: String = "",
         childProfileID: UUID,
         childName: String,
         grade: String,
@@ -25,6 +27,7 @@ final class Exam {
         isCompleted: Bool = false
     ) {
         self.examID = examID
+        self.parentID = parentID
         self.childProfileID = childProfileID
         self.childName = childName
         self.grade = grade

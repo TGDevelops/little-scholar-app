@@ -3,6 +3,7 @@ import SwiftData
 
 @Model
 final class ExamResult {
+    var parentID: String = ""
     var childProfileID: UUID = UUID()
     var childName: String = ""
     var grade: String = "Grade 1"
@@ -14,6 +15,7 @@ final class ExamResult {
     var evaluations: [AnswerEvaluation] = []
 
     init(
+        parentID: String = "",
         childProfileID: UUID,
         childName: String,
         grade: String,
@@ -24,6 +26,7 @@ final class ExamResult {
         completedAt: Date = .now,
         evaluations: [AnswerEvaluation]
     ) {
+        self.parentID = parentID
         self.childProfileID = childProfileID
         self.childName = childName
         self.grade = grade

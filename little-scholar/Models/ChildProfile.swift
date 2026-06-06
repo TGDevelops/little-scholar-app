@@ -4,14 +4,16 @@ import SwiftData
 @Model
 final class ChildProfile {
     var profileID: UUID = UUID()
+    var parentID: String = ""
     var name: String = ""
     var age: Int = 6
     var grade: String = "Grade 1"
     var avatar: String = KidAvatar.unicorn.rawValue
     var createdAt: Date = Date.now
 
-    init(profileID: UUID = UUID(), name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
+    init(profileID: UUID = UUID(), parentID: String = "", name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
         self.profileID = profileID
+        self.parentID = parentID
         self.name = name
         self.age = age
         self.grade = grade

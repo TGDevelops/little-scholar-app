@@ -8,18 +8,21 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import UIKit
 
 @Model
 final class ChildProfile {
     var profileID: UUID = UUID()
+    var parentID: String = ""
     var name: String = ""
     var age: Int = 6
     var grade: String = "Grade 1"
     var avatar: String = KidAvatar.unicorn.rawValue
     var createdAt: Date = Date.now
 
-    init(profileID: UUID = UUID(), name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
+    init(profileID: UUID = UUID(), parentID: String = "", name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
         self.profileID = profileID
+        self.parentID = parentID
         self.name = name
         self.age = age
         self.grade = grade
@@ -31,6 +34,7 @@ final class ChildProfile {
 @Model
 final class Exam {
     var examID: UUID = UUID()
+    var parentID: String = ""
     var childProfileID: UUID = UUID()
     var childName: String = ""
     var grade: String = "Grade 1"
@@ -40,7 +44,8 @@ final class Exam {
     var isCompleted: Bool = false
     var questions: [Question] = []
 
-    init(childProfileID: UUID, childName: String, grade: String, subject: Subject, difficulty: Difficulty, questions: [Question]) {
+    init(parentID: String = "", childProfileID: UUID, childName: String, grade: String, subject: Subject, difficulty: Difficulty, questions: [Question]) {
+        self.parentID = parentID
         self.childProfileID = childProfileID
         self.childName = childName
         self.grade = grade
@@ -52,6 +57,7 @@ final class Exam {
 
 @Model
 final class ExamResult {
+    var parentID: String = ""
     var childProfileID: UUID = UUID()
     var childName: String = ""
     var grade: String = "Grade 1"
@@ -62,7 +68,8 @@ final class ExamResult {
     var completedAt: Date = Date.now
     var evaluations: [AnswerEvaluation] = []
 
-    init(childProfileID: UUID, childName: String, grade: String, subject: String, difficulty: String, totalQuestions: Int, correctAnswers: Int, evaluations: [AnswerEvaluation]) {
+    init(parentID: String = "", childProfileID: UUID, childName: String, grade: String, subject: String, difficulty: String, totalQuestions: Int, correctAnswers: Int, evaluations: [AnswerEvaluation]) {
+        self.parentID = parentID
         self.childProfileID = childProfileID
         self.childName = childName
         self.grade = grade
@@ -232,6 +239,13 @@ enum KidAvatar: String, CaseIterable, Identifiable, Codable {
     static func avatar(for rawValue: String) -> KidAvatar {
         KidAvatar(rawValue: rawValue) ?? .unicorn
     }
+}
+
+enum ScholarTheme {
+    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
+    static let elevatedSurface = Color(uiColor: .tertiarySystemGroupedBackground)
+    static let controlSurface = Color(uiColor: .systemBackground)
+    static let shadow = Color(uiColor: .black).opacity(0.10)
 }
 
 enum AppMode: String, CaseIterable, Identifiable {
@@ -433,10 +447,11 @@ struct BackendExamPaperDTO: Decodable {
     let questionCount: Int
     let questions: [BackendQuestionDTO]
 
-    func makeExam(for profile: ChildProfile) -> Exam {
+    func makeExam(for profile: ChildProfile, parentID: String) -> Exam {
         let subjectValue = Subject(rawValue: subject) ?? .maths
         let difficultyValue = Difficulty(rawValue: difficulty) ?? .easy
         let exam = Exam(
+            parentID: parentID,
             childProfileID: profile.profileID,
             childName: profile.name,
             grade: grade,
@@ -521,6 +536,7 @@ struct ContentView: View {
     @Query(sort: \ExamResult.completedAt, order: .reverse) private var results: [ExamResult]
 
     @AppStorage("apiBaseURL") private var apiBaseURL = "https://little-scholar-server-production.up.railway.app"
+    @AppStorage("parentID") private var parentID = ""
     @AppStorage("parentName") private var parentName = ""
     @AppStorage("parentEmail") private var parentEmail = ""
     @AppStorage("parentCity") private var parentCity = ""
@@ -532,6 +548,7 @@ struct ContentView: View {
     @State private var latestResult: ExamResult?
     @State private var saveErrorMessage: String?
     @State private var isGeneratingExam = false
+    @State private var showingLogin = false
 
     private let answerEvaluation = AnswerEvaluationService()
 
@@ -546,15 +563,21 @@ struct ContentView: View {
 
                 if parentIsRegistered && parentIsLoggedIn {
                     mainAppShell
-                } else if parentIsRegistered {
+                } else if parentIsRegistered || showingLogin {
                     ParentLoginView(
                         registeredEmail: parentEmail,
-                        parentName: parentName,
+                        parentName: parentName.isEmpty ? "Parent" : parentName,
                         onLogin: loginParent,
-                        onRegisterAgain: resetParentRegistration
+                        onRegisterAgain: {
+                            showingLogin = false
+                            resetParentRegistration()
+                        }
                     )
                 } else {
-                    ParentRegistrationView(onRegister: registerParent)
+                    ParentRegistrationView(
+                        onRegister: registerParent,
+                        onGoToLogin: { showingLogin = true }
+                    )
                 }
             }
             .navigationTitle("Little Scholar")
@@ -566,6 +589,7 @@ struct ContentView: View {
             }
             .task {
                 migrateBackendURLIfNeeded()
+                migrateLegacyRecordsToCurrentParentIfNeeded()
                 repairDuplicateProfileIDs()
                 removeInvalidPendingExams()
             }
@@ -585,13 +609,21 @@ struct ContentView: View {
     private var content: some View {
         switch selectedMode {
         case .parent:
-            ScrollView { ChildProfileView(profiles: profiles, onSaveProfile: saveProfile).padding() }
+            ScrollView { ChildProfileView(profiles: currentParentProfiles, onSaveProfile: saveProfile).padding() }
         case .exam:
-            ScrollView { ExamSetupView(profiles: profiles, exams: displayableExams, isGenerating: isGeneratingExam, onGenerateExam: generateExam).padding() }
+            ScrollView { ExamSetupView(profiles: currentParentProfiles, exams: displayableExams, isGenerating: isGeneratingExam, onGenerateExam: generateExam).padding() }
         case .kid:
-            KidExamListView(profiles: profiles, exams: exams.filter { !$0.isCompleted }, latestResult: latestResult, onSubmit: evaluateExam, onCreateExam: { selectedMode = .exam })
+            KidExamListView(
+                profiles: currentParentProfiles,
+                exams: currentParentExams.filter { !$0.isCompleted },
+                latestResult: latestResult,
+                onSubmit: evaluateExam,
+                onCreateExam: { selectedMode = .exam },
+                onDeleteProfile: deleteProfile,
+                onUpdateProfile: updateProfile
+            )
         case .history:
-            PerformanceDashboardView(profiles: profiles, results: results)
+            PerformanceDashboardView(profiles: currentParentProfiles, results: currentParentResults)
         }
     }
 
@@ -599,8 +631,20 @@ struct ContentView: View {
         Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })
     }
 
+    private var currentParentProfiles: [ChildProfile] {
+        profiles.filter { $0.parentID == parentID }
+    }
+
+    private var currentParentExams: [Exam] {
+        exams.filter { $0.parentID == parentID }
+    }
+
+    private var currentParentResults: [ExamResult] {
+        results.filter { $0.parentID == parentID }
+    }
+
     private var displayableExams: [Exam] {
-        exams.filter { !$0.questions.isEmpty }
+        currentParentExams.filter { !$0.questions.isEmpty }
     }
 
     private func registerParent(name: String, email: String, city: String, password: String) async -> Bool {
@@ -634,19 +678,25 @@ struct ContentView: View {
     }
 
     private func saveAuthenticatedParent(_ payload: AuthPayloadDTO) {
+        parentID = payload.user.id
         parentName = payload.user.name
         parentEmail = payload.user.email
         parentCity = payload.user.city
         parentAccessToken = payload.accessToken
+        latestResult = nil
+        selectedMode = .parent
         parentIsRegistered = true
         parentIsLoggedIn = true
     }
 
     private func resetParentRegistration() {
+        parentID = ""
         parentName = ""
         parentEmail = ""
         parentCity = ""
         parentAccessToken = ""
+        latestResult = nil
+        selectedMode = .parent
         parentIsRegistered = false
         parentIsLoggedIn = false
     }
@@ -655,7 +705,51 @@ struct ContentView: View {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
         do {
-            modelContext.insert(ChildProfile(name: trimmedName, age: age, grade: grade, avatar: avatar))
+            modelContext.insert(ChildProfile(parentID: parentID, name: trimmedName, age: age, grade: grade, avatar: avatar))
+            try modelContext.save()
+        } catch {
+            saveErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteProfile(_ profile: ChildProfile) {
+        guard profile.parentID == parentID else { return }
+
+        do {
+            let profileID = profile.profileID
+            for exam in currentParentExams where exam.childProfileID == profileID {
+                modelContext.delete(exam)
+            }
+            for result in currentParentResults where result.childProfileID == profileID {
+                modelContext.delete(result)
+            }
+            if latestResult?.childProfileID == profileID {
+                latestResult = nil
+            }
+            modelContext.delete(profile)
+            try modelContext.save()
+        } catch {
+            saveErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func updateProfile(_ profile: ChildProfile, name: String, age: Int, grade: String, avatar: KidAvatar) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard profile.parentID == parentID, !trimmedName.isEmpty else { return }
+
+        do {
+            let profileID = profile.profileID
+            profile.name = trimmedName
+            profile.age = age
+            profile.grade = grade
+            profile.avatar = avatar.rawValue
+
+            for exam in currentParentExams where exam.childProfileID == profileID {
+                exam.childName = trimmedName
+            }
+            for result in currentParentResults where result.childProfileID == profileID {
+                result.childName = trimmedName
+            }
             try modelContext.save()
         } catch {
             saveErrorMessage = error.localizedDescription
@@ -674,7 +768,7 @@ struct ContentView: View {
                     difficulty: difficulty,
                     questionCount: numberOfQuestions
                 )
-                let exam = backendExam.makeExam(for: profile)
+                let exam = backendExam.makeExam(for: profile, parentID: parentID)
                 modelContext.insert(exam)
                 try modelContext.save()
                 isGeneratingExam = false
@@ -696,6 +790,7 @@ struct ContentView: View {
 
     private func evaluateExam(exam: Exam, answers: [UUID: String]) -> ExamResult? {
         let result = answerEvaluation.evaluate(exam: exam, answers: answers)
+        result.parentID = parentID
         do {
             exam.isCompleted = true
             modelContext.insert(result)
@@ -714,8 +809,34 @@ struct ContentView: View {
         }
     }
 
+    private func migrateLegacyRecordsToCurrentParentIfNeeded() {
+        guard parentIsLoggedIn, !parentID.isEmpty else { return }
+
+        var didMigrate = false
+        for profile in profiles where profile.parentID.isEmpty {
+            profile.parentID = parentID
+            didMigrate = true
+        }
+        for exam in exams where exam.parentID.isEmpty {
+            exam.parentID = parentID
+            didMigrate = true
+        }
+        for result in results where result.parentID.isEmpty {
+            result.parentID = parentID
+            didMigrate = true
+        }
+
+        if didMigrate {
+            do {
+                try modelContext.save()
+            } catch {
+                saveErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
     private func removeInvalidPendingExams() {
-        let invalidExams = exams.filter { !$0.isCompleted && $0.questions.isEmpty }
+        let invalidExams = currentParentExams.filter { !$0.isCompleted && $0.questions.isEmpty }
         guard !invalidExams.isEmpty else { return }
 
         for exam in invalidExams {
@@ -733,7 +854,7 @@ struct ContentView: View {
         var seenIDs = Set<UUID>()
         var didRepair = false
 
-        for profile in profiles {
+        for profile in currentParentProfiles {
             if seenIDs.contains(profile.profileID) {
                 profile.profileID = UUID()
                 didRepair = true
@@ -753,6 +874,7 @@ struct ContentView: View {
 
 struct ParentRegistrationView: View {
     let onRegister: (String, String, String, String) async -> Bool
+    let onGoToLogin: () -> Void
 
     @State private var name = ""
     @State private var email = ""
@@ -761,13 +883,17 @@ struct ParentRegistrationView: View {
     @State private var acceptedDisclaimer = false
     @State private var isSubmitting = false
 
+    private var missingRegistrationRequirement: String? {
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Enter parent name." }
+        if !email.contains("@") { return "Enter a valid email." }
+        if city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Enter city." }
+        if password.count < 8 { return "Password must be at least 8 characters." }
+        if !acceptedDisclaimer { return "Accept the disclaimer to continue." }
+        return nil
+    }
+
     private var canRegister: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        email.contains("@") &&
-        !city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        password.count >= 8 &&
-        acceptedDisclaimer == true &&
-        !isSubmitting
+        missingRegistrationRequirement == nil && !isSubmitting
     }
 
     var body: some View {
@@ -807,6 +933,13 @@ struct ParentRegistrationView: View {
                         }
                         .toggleStyle(.switch)
 
+                        if let missingRegistrationRequirement {
+                            Label(missingRegistrationRequirement, systemImage: "info.circle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
                         Button {
                             Task {
                                 isSubmitting = true
@@ -819,6 +952,12 @@ struct ParentRegistrationView: View {
                         }
                         .buttonStyle(CheerfulButtonStyle(color: .orange))
                         .disabled(!canRegister)
+
+                        Button(action: onGoToLogin) {
+                            Label("Already registered? Login", systemImage: "arrow.right.circle.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(CheerfulButtonStyle(color: .teal))
                     }
                 }
             }
@@ -1114,11 +1253,17 @@ struct KidExamListView: View {
     let latestResult: ExamResult?
     let onSubmit: (Exam, [UUID: String]) -> ExamResult?
     let onCreateExam: () -> Void
+    let onDeleteProfile: (ChildProfile) -> Void
+    let onUpdateProfile: (ChildProfile, String, Int, String, KidAvatar) -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedProfileID: PersistentIdentifier?
     @State private var selectedExam: Exam?
     @State private var completedResult: ExamResult?
+    @State private var profilePendingDeletion: ChildProfile?
+    @State private var profileBeingEdited: ChildProfile?
+    @State private var showDeleteProfileConfirmation = false
+    @State private var showEditProfileSheet = false
 
     private var usesWideLayout: Bool { horizontalSizeClass == .regular }
 
@@ -1155,6 +1300,25 @@ struct KidExamListView: View {
                 .onAppear(perform: ensureSelectedProfile)
             }
         }
+        .confirmationDialog(
+            "Delete kid profile?",
+            isPresented: $showDeleteProfileConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Profile and History", role: .destructive) {
+                confirmProfileDeletion()
+            }
+            Button("Cancel", role: .cancel) {
+                profilePendingDeletion = nil
+            }
+        } message: {
+            Text("This will remove the kid profile, assigned exams, and exam history for that kid.")
+        }
+        .sheet(isPresented: $showEditProfileSheet) {
+            if let profileBeingEdited {
+                EditKidProfileView(profile: profileBeingEdited, onSave: onUpdateProfile)
+            }
+        }
     }
 
     private var profilePicker: some View {
@@ -1162,20 +1326,58 @@ struct KidExamListView: View {
             if profiles.isEmpty {
                 EmptyStateView(icon: "person.crop.circle.badge.questionmark", title: "No kid profiles", message: "Ask a parent to create a profile first.")
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
                     ForEach(profiles) { profile in
-                        Button {
-                            selectedProfileID = profile.persistentModelID
-                            selectedExam = nil
-                            completedResult = nil
-                        } label: {
-                            let isSelected = selectedProfileID == profile.persistentModelID
-                            VStack(spacing: 8) {
-                                AvatarBadge(avatar: KidAvatar.avatar(for: profile.avatar), isSelected: isSelected)
-                                Text(profile.name).font(.title3.bold()).foregroundStyle(.primary).lineLimit(1)
-                                Text(profile.grade).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                            }.frame(maxWidth: .infinity).padding().background(isSelected ? Color.green.opacity(0.2) : Color.white.opacity(0.85)).clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        }.buttonStyle(.plain)
+                        let isSelected = selectedProfileID == profile.persistentModelID
+                        VStack(spacing: 8) {
+                            HStack(spacing: 8) {
+                                Spacer()
+                                Button {
+                                    profileBeingEdited = profile
+                                    showEditProfileSheet = true
+                                } label: {
+                                    Image(systemName: "pencil.circle.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(.teal)
+                                        .frame(width: 36, height: 36)
+                                        .background(Color.teal.opacity(0.12))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Edit \(profile.name) profile")
+
+                                Button {
+                                    profilePendingDeletion = profile
+                                    showDeleteProfileConfirmation = true
+                                } label: {
+                                    Image(systemName: "trash.circle.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(.red)
+                                        .frame(width: 36, height: 36)
+                                        .background(Color.red.opacity(0.12))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Delete \(profile.name) profile")
+                            }
+
+                            Button {
+                                selectedProfileID = profile.persistentModelID
+                                selectedExam = nil
+                                completedResult = nil
+                            } label: {
+                                VStack(spacing: 8) {
+                                    AvatarBadge(avatar: KidAvatar.avatar(for: profile.avatar), isSelected: isSelected)
+                                    Text(profile.name).font(.title3.bold()).foregroundStyle(.primary).lineLimit(1)
+                                    Text(profile.grade).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(12)
+                        .background(isSelected ? Color.green.opacity(0.24) : ScholarTheme.controlSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                 }
             }
@@ -1205,6 +1407,82 @@ struct KidExamListView: View {
     private func ensureSelectedProfile() {
         if let selectedProfileID, !profiles.contains(where: { $0.persistentModelID == selectedProfileID }) {
             self.selectedProfileID = nil
+        }
+    }
+
+    private func confirmProfileDeletion() {
+        guard let profile = profilePendingDeletion else { return }
+        if selectedProfileID == profile.persistentModelID {
+            selectedProfileID = nil
+            selectedExam = nil
+            completedResult = nil
+        }
+        onDeleteProfile(profile)
+        profilePendingDeletion = nil
+    }
+}
+
+struct EditKidProfileView: View {
+    let profile: ChildProfile
+    let onSave: (ChildProfile, String, Int, String, KidAvatar) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var age: Int
+    @State private var grade: String
+    @State private var avatar: KidAvatar
+
+    private let grades = ["Nursery", "LKG", "UKG", "Kindergarten", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5"]
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    init(profile: ChildProfile, onSave: @escaping (ChildProfile, String, Int, String, KidAvatar) -> Void) {
+        self.profile = profile
+        self.onSave = onSave
+        _name = State(initialValue: profile.name)
+        _age = State(initialValue: profile.age)
+        _grade = State(initialValue: profile.grade)
+        _avatar = State(initialValue: KidAvatar.avatar(for: profile.avatar))
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    sectionCard(title: "Modify Kid Profile", icon: "pencil.circle.fill") {
+                        VStack(spacing: 14) {
+                            TextField("Kid name", text: $name)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.title3)
+                            Stepper("Age: \(age)", value: $age, in: 3...12)
+                                .font(.title3.bold())
+                            Picker("Grade", selection: $grade) {
+                                ForEach(grades, id: \.self) { Text($0).tag($0) }
+                            }
+                            .pickerStyle(.menu)
+                            AvatarPicker(selection: $avatar)
+                        }
+                    }
+                }
+                .padding()
+                .adaptiveContentWidth(maxWidth: 620)
+            }
+            .navigationTitle("Edit Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave(profile, name, age, grade, avatar)
+                        dismiss()
+                    }
+                    .disabled(!canSave)
+                }
+            }
         }
     }
 }
@@ -1263,7 +1541,7 @@ struct ExamAttemptView: View {
                                         .multilineTextAlignment(.leading)
                                 }
                                 .padding()
-                                .background(answers[currentQuestion.id] == option ? Color.green.opacity(0.24) : Color.white.opacity(0.82))
+                                .background(answers[currentQuestion.id] == option ? Color.green.opacity(0.24) : ScholarTheme.controlSurface)
                                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                             }
                             .buttonStyle(.plain)
@@ -1271,9 +1549,9 @@ struct ExamAttemptView: View {
                     }
                 }
                 .padding(20)
-                .background(Color.white.opacity(0.92))
+                .background(ScholarTheme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .shadow(color: .black.opacity(0.08), radius: 12, y: 6)
+                .shadow(color: ScholarTheme.shadow, radius: 12, y: 6)
 
                 HStack(spacing: 12) {
                     Button { currentIndex = max(0, currentIndex - 1) } label: {
@@ -1377,9 +1655,9 @@ struct ResultView: View {
                     Text(result.feedback).font(.title3.weight(.medium)).multilineTextAlignment(.center).foregroundStyle(.secondary)
                 }
                 .padding(24)
-                .background(Color.white.opacity(0.92))
+                .background(ScholarTheme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .shadow(color: .black.opacity(0.08), radius: 12, y: 6)
+                .shadow(color: ScholarTheme.shadow, radius: 12, y: 6)
                 QuestionReviewList(evaluations: result.evaluations)
             }
             .padding()
@@ -1403,7 +1681,7 @@ struct QuestionReviewList: View {
                     Text("Your answer: \(item.selectedAnswer)").foregroundStyle(item.isCorrect ? .green : .red)
                     if !item.isCorrect { Text("Correct answer: \(item.question.correctAnswer)") }
                     Text(item.question.explanation).font(.subheadline).foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, alignment: .leading).padding().background(Color.white.opacity(0.88)).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }.frame(maxWidth: .infinity, alignment: .leading).padding().background(ScholarTheme.surface).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
         }
     }
@@ -1438,7 +1716,7 @@ struct HeaderView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
-                .background(Color.white.opacity(0.85))
+                .background(ScholarTheme.controlSurface)
                 .clipShape(Circle())
                 .accessibilityLabel("Logout")
             }
@@ -1460,8 +1738,15 @@ struct ModeNavigation: View {
         HStack(spacing: 8) {
             ForEach(AppMode.allCases) { mode in
                 Button { selectedMode = mode } label: {
-                    VStack(spacing: 6) { Image(systemName: mode.icon).font(.headline); Text(mode.rawValue).font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.75) }
-                        .frame(maxWidth: .infinity, minHeight: 62).foregroundStyle(selectedMode == mode ? .white : .primary).background(selectedMode == mode ? Color.orange : Color.white.opacity(0.85)).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)).shadow(color: .black.opacity(selectedMode == mode ? 0.12 : 0.04), radius: 8, y: 4)
+                    VStack(spacing: 6) {
+                        Image(systemName: mode.icon).font(.headline)
+                        Text(mode.rawValue).font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.75)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 62)
+                    .foregroundStyle(selectedMode == mode ? Color.white : Color.primary)
+                    .background(selectedMode == mode ? Color.orange : ScholarTheme.controlSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .shadow(color: ScholarTheme.shadow.opacity(selectedMode == mode ? 1 : 0.45), radius: 8, y: 4)
                 }.buttonStyle(.plain)
             }
         }
@@ -1502,7 +1787,7 @@ struct AvatarPicker: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(selection == avatar ? avatar.color.opacity(0.18) : Color.white.opacity(0.75))
+                        .background(selection == avatar ? avatar.color.opacity(0.24) : ScholarTheme.controlSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .buttonStyle(.plain)
@@ -1529,7 +1814,7 @@ struct AvatarBadge: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title3)
                     .foregroundStyle(.green)
-                    .background(Color.white.clipShape(Circle()))
+                    .background(ScholarTheme.controlSurface.clipShape(Circle()))
             }
         }
         .accessibilityLabel(avatar.rawValue)
@@ -1610,16 +1895,64 @@ struct CheerfulButtonStyle: ButtonStyle {
 }
 
 struct LittleScholarBackground: View {
-    var body: some View { LinearGradient(colors: [Color.yellow.opacity(0.28), Color.cyan.opacity(0.22), Color.pink.opacity(0.18)], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea() }
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var gradientColors: [Color] {
+        if colorScheme == .dark {
+            return [
+                Color.indigo.opacity(0.30),
+                Color.teal.opacity(0.18),
+                Color.purple.opacity(0.24)
+            ]
+        }
+        return [
+            Color.yellow.opacity(0.28),
+            Color.cyan.opacity(0.22),
+            Color.pink.opacity(0.18)
+        ]
+    }
+
+    var body: some View {
+        LinearGradient(colors: gradientColors, startPoint: .topLeading, endPoint: .bottomTrailing)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .ignoresSafeArea()
+    }
 }
 
 @ViewBuilder
 func sectionCard<Content: View>(title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
-    VStack(alignment: .leading, spacing: 16) { Label(title, systemImage: icon).font(.title2.bold()).foregroundStyle(.primary); content() }.frame(maxWidth: .infinity, alignment: .leading).padding(20).background(Color.white.opacity(0.9)).clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous)).shadow(color: .black.opacity(0.08), radius: 12, y: 6)
+    VStack(alignment: .leading, spacing: 16) {
+        Label(title, systemImage: icon)
+            .font(.title2.bold())
+            .foregroundStyle(.primary)
+        content()
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(20)
+    .background(ScholarTheme.surface)
+    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    .shadow(color: ScholarTheme.shadow, radius: 12, y: 6)
 }
 
 func row(icon: String, title: String, subtitle: String, color: Color) -> some View {
-    HStack(spacing: 12) { Image(systemName: icon).font(.title).foregroundStyle(color).frame(width: 42); VStack(alignment: .leading, spacing: 4) { Text(title).font(.headline).foregroundStyle(.primary); Text(subtitle).font(.subheadline.weight(.medium)).foregroundStyle(.secondary) }; Spacer() }.padding().background(Color.white.opacity(0.86)).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    HStack(spacing: 12) {
+        Image(systemName: icon)
+            .font(.title)
+            .foregroundStyle(color)
+            .frame(width: 42)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.primary)
+            Text(subtitle)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        Spacer()
+    }
+    .padding()
+    .background(ScholarTheme.controlSurface)
+    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 }
 
 private extension View {
