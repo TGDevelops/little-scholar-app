@@ -14,6 +14,6 @@ struct little_scholarApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [ChildProfile.self, Exam.self, ExamResult.self])
+        .modelContainer(for: [ChildProfile.self, Exam.self, ExamResult.self, AIInsight.self])
     }
 }

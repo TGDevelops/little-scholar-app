@@ -5,10 +5,10 @@
 //  Created by Tejesh on 26/05/26.
 //
 
+import CoreData
 import Foundation
 import SwiftData
 import SwiftUI
-import UIKit
 
 @Model
 final class ChildProfile {
@@ -52,6 +52,47 @@ final class Exam {
         self.subject = subject.rawValue
         self.difficulty = difficulty.rawValue
         self.questions = questions
+    }
+}
+
+@Model
+final class AIInsight {
+    var id: String = UUID().uuidString
+    var parentID: String = ""
+    var childLocalId: UUID = UUID()
+    var summary: String = ""
+    var strengths: [String] = []
+    var needsPractice: [String] = []
+    var recommendations: [String] = []
+    var suggestedDifficulty: String = "Easy"
+    var tokensUsed: Int = 0
+    var remainingTokens: Int = 0
+    var generatedAt: Date = Date.now
+
+    init(
+        id: String = UUID().uuidString,
+        parentID: String = "",
+        childLocalId: UUID,
+        summary: String,
+        strengths: [String],
+        needsPractice: [String],
+        recommendations: [String],
+        suggestedDifficulty: String,
+        tokensUsed: Int,
+        remainingTokens: Int,
+        generatedAt: Date
+    ) {
+        self.id = id
+        self.parentID = parentID
+        self.childLocalId = childLocalId
+        self.summary = summary
+        self.strengths = strengths
+        self.needsPractice = needsPractice
+        self.recommendations = recommendations
+        self.suggestedDifficulty = suggestedDifficulty
+        self.tokensUsed = tokensUsed
+        self.remainingTokens = remainingTokens
+        self.generatedAt = generatedAt
     }
 }
 
@@ -168,6 +209,32 @@ struct Question: Codable, Identifiable, Hashable {
         marks = try container.decodeIfPresent(Int.self, forKey: .marks) ?? 1
     }
 
+    var sanitizedForPersistence: Question {
+        let cleanOptions = options
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let cleanAcceptableAnswers = acceptableAnswers
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanCorrectAnswer = correctAnswer.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanExplanation = explanation.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanTopic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return Question(
+            id: id,
+            backendID: backendID.trimmingCharacters(in: .whitespacesAndNewlines),
+            type: type.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "mcq" : type,
+            prompt: cleanPrompt.isEmpty ? "Untitled question" : cleanPrompt,
+            options: cleanOptions,
+            correctAnswer: cleanCorrectAnswer.isEmpty ? cleanAcceptableAnswers.first ?? "" : cleanCorrectAnswer,
+            acceptableAnswers: cleanAcceptableAnswers,
+            explanation: cleanExplanation.isEmpty ? "Review this concept and try again." : cleanExplanation,
+            topic: cleanTopic.isEmpty ? "General" : cleanTopic,
+            marks: max(1, marks)
+        )
+    }
+
     func accepts(_ answer: String) -> Bool {
         let normalizedAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let accepted = ([correctAnswer] + acceptableAnswers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
@@ -241,18 +308,12 @@ enum KidAvatar: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-enum ScholarTheme {
-    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
-    static let elevatedSurface = Color(uiColor: .tertiarySystemGroupedBackground)
-    static let controlSurface = Color(uiColor: .systemBackground)
-    static let shadow = Color(uiColor: .black).opacity(0.10)
-}
-
 enum AppMode: String, CaseIterable, Identifiable {
     case parent = "Parent"
     case exam = "Exam"
     case kid = "Kid"
-    case history = "History"
+    case performance = "Performance"
+    case aiInsights = "AI Insights"
 
     var id: String { rawValue }
 
@@ -261,7 +322,8 @@ enum AppMode: String, CaseIterable, Identifiable {
         case .parent: "person.2.fill"
         case .exam: "doc.text.fill"
         case .kid: "figure.child.circle.fill"
-        case .history: "chart.bar.doc.horizontal.fill"
+        case .performance: "chart.bar.doc.horizontal.fill"
+        case .aiInsights: "sparkles"
         }
     }
 }
@@ -336,12 +398,16 @@ struct AnswerEvaluationService {
 enum APIError: LocalizedError {
     case invalidBaseURL
     case invalidResponse
+    case unauthorized
+    case tokenLimitExceeded
     case server(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidBaseURL: "Set a valid backend base URL."
         case .invalidResponse: "The backend returned an invalid response."
+        case .unauthorized: "Your session has expired. Please login again."
+        case .tokenLimitExceeded: "AI insight limit reached. Please try again later or upgrade when subscriptions are available."
         case .server(let message): message
         }
     }
@@ -376,6 +442,10 @@ struct APIClient {
         )
     }
 
+    func generateAnalyticsInsight(request: AIInsightRequestDTO) async throws -> AIInsightResponseDTO {
+        try await post(path: "/api/analytics/generate", body: request, authorized: true)
+    }
+
     private func post<Request: Encodable, Response: Decodable>(path: String, body: Request, authorized: Bool) async throws -> Response {
         let endpoint = try baseURL.appending(path: path)
         var request = URLRequest(url: endpoint)
@@ -390,7 +460,12 @@ struct APIClient {
         guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(httpResponse.statusCode) else {
             let errorResponse = try? JSONDecoder().decode(ErrorResponseDTO.self, from: data)
-            throw APIError.server(errorResponse?.error.message ?? "Request failed with status \(httpResponse.statusCode).")
+            let message = errorResponse?.error.message ?? "Request failed with status \(httpResponse.statusCode)."
+            if httpResponse.statusCode == 401 { throw APIError.unauthorized }
+            if httpResponse.statusCode == 429 || message.localizedCaseInsensitiveContains("token") || message.localizedCaseInsensitiveContains("limit") {
+                throw APIError.tokenLimitExceeded
+            }
+            throw APIError.server(message)
         }
         let success = try JSONDecoder().decode(APISuccessResponse<Response>.self, from: data)
         return success.data
@@ -427,6 +502,62 @@ struct GenerateExamRequestDTO: Encodable {
     let questionCount: Int
 }
 
+struct AIInsightRequestDTO: Encodable {
+    let child: ChildSummaryDTO
+    let period: String
+    let summary: LearningSummaryDTO
+}
+
+struct ChildSummaryDTO: Encodable {
+    let age: Int
+    let grade: String
+}
+
+struct LearningSummaryDTO: Encodable {
+    let totalExams: Int
+    let averageScore: Int
+    let bestScore: Int
+    let subjects: [SubjectPerformanceDTO]
+    let topicPerformance: [TopicCountDTO]
+    let recentTrend: [RecentTrendDTO]
+}
+
+struct SubjectPerformanceDTO: Encodable {
+    let subject: String
+    let averageScore: Int
+    let totalExams: Int
+    let strongTopics: [String]
+    let weakTopics: [String]
+}
+
+struct TopicCountDTO: Encodable {
+    let topic: String
+    let correct: Int
+    let wrong: Int
+}
+
+struct RecentTrendDTO: Encodable {
+    let subject: String
+    let percentage: Int
+    let attemptedAt: String
+}
+
+struct AIInsightResponseDTO: Decodable {
+    let insightId: String
+    let summary: String
+    let strengths: [String]
+    let needsPractice: [String]
+    let recommendations: [String]
+    let suggestedDifficulty: String
+    let generatedAt: String
+    let usage: AIInsightUsageDTO?
+}
+
+struct AIInsightUsageDTO: Decodable {
+    let tokensUsed: Int
+    let remainingTokens: Int
+}
+
 struct AuthPayloadDTO: Decodable {
     let user: UserDTO
     let accessToken: String
@@ -450,14 +581,15 @@ struct BackendExamPaperDTO: Decodable {
     func makeExam(for profile: ChildProfile, parentID: String) -> Exam {
         let subjectValue = Subject(rawValue: subject) ?? .maths
         let difficultyValue = Difficulty(rawValue: difficulty) ?? .easy
+        let sanitizedQuestions = questions.map(\.modelQuestion).map(\.sanitizedForPersistence)
         let exam = Exam(
             parentID: parentID,
             childProfileID: profile.profileID,
-            childName: profile.name,
-            grade: grade,
+            childName: profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Little Scholar" : profile.name,
+            grade: profile.grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? grade : profile.grade,
             subject: subjectValue,
             difficulty: difficultyValue,
-            questions: questions.map(\.modelQuestion)
+            questions: sanitizedQuestions
         )
         if let uuid = UUID(uuidString: examId) {
             exam.examID = uuid
@@ -534,6 +666,7 @@ struct ContentView: View {
     @Query(sort: \ChildProfile.createdAt, order: .reverse) private var profiles: [ChildProfile]
     @Query(sort: \Exam.createdAt, order: .reverse) private var exams: [Exam]
     @Query(sort: \ExamResult.completedAt, order: .reverse) private var results: [ExamResult]
+    @Query(sort: \AIInsight.generatedAt, order: .reverse) private var aiInsights: [AIInsight]
 
     @AppStorage("apiBaseURL") private var apiBaseURL = "https://little-scholar-server-production.up.railway.app"
     @AppStorage("parentID") private var parentID = ""
@@ -622,8 +755,17 @@ struct ContentView: View {
                 onDeleteProfile: deleteProfile,
                 onUpdateProfile: updateProfile
             )
-        case .history:
+        case .performance:
             PerformanceDashboardView(profiles: currentParentProfiles, results: currentParentResults)
+        case .aiInsights:
+            AIInsightsView(
+                profiles: currentParentProfiles,
+                results: currentParentResults,
+                cachedInsights: currentParentAIInsights,
+                apiClient: apiClient,
+                onInsightGenerated: saveAIInsight,
+                onUnauthorized: handleUnauthorizedSession
+            )
         }
     }
 
@@ -641,6 +783,10 @@ struct ContentView: View {
 
     private var currentParentResults: [ExamResult] {
         results.filter { $0.parentID == parentID }
+    }
+
+    private var currentParentAIInsights: [AIInsight] {
+        aiInsights.filter { $0.parentID == parentID }
     }
 
     private var displayableExams: [Exam] {
@@ -723,6 +869,9 @@ struct ContentView: View {
             for result in currentParentResults where result.childProfileID == profileID {
                 modelContext.delete(result)
             }
+            for insight in currentParentAIInsights where insight.childLocalId == profileID {
+                modelContext.delete(insight)
+            }
             if latestResult?.childProfileID == profileID {
                 latestResult = nil
             }
@@ -756,6 +905,50 @@ struct ContentView: View {
         }
     }
 
+    private func saveAIInsight(_ response: AIInsightResponseDTO, for profile: ChildProfile) {
+        guard profile.parentID == parentID else { return }
+        let generatedAt = ISO8601DateFormatter().date(from: response.generatedAt) ?? .now
+        let existingInsight = currentParentAIInsights.first { $0.childLocalId == profile.profileID }
+
+        do {
+            if let existingInsight {
+                existingInsight.id = response.insightId
+                existingInsight.summary = response.summary
+                existingInsight.strengths = response.strengths
+                existingInsight.needsPractice = response.needsPractice
+                existingInsight.recommendations = response.recommendations
+                existingInsight.suggestedDifficulty = response.suggestedDifficulty
+                existingInsight.tokensUsed = response.usage?.tokensUsed ?? 0
+                existingInsight.remainingTokens = response.usage?.remainingTokens ?? 0
+                existingInsight.generatedAt = generatedAt
+            } else {
+                modelContext.insert(AIInsight(
+                    id: response.insightId,
+                    parentID: parentID,
+                    childLocalId: profile.profileID,
+                    summary: response.summary,
+                    strengths: response.strengths,
+                    needsPractice: response.needsPractice,
+                    recommendations: response.recommendations,
+                    suggestedDifficulty: response.suggestedDifficulty,
+                    tokensUsed: response.usage?.tokensUsed ?? 0,
+                    remainingTokens: response.usage?.remainingTokens ?? 0,
+                    generatedAt: generatedAt
+                ))
+            }
+            try modelContext.save()
+        } catch {
+            saveErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func handleUnauthorizedSession() {
+        parentAccessToken = ""
+        parentIsLoggedIn = false
+        showingLogin = true
+        selectedMode = .parent
+    }
+
     private func generateExam(profile: ChildProfile, subject: Subject, difficulty: Difficulty, numberOfQuestions: Int) {
         guard !isGeneratingExam else { return }
         isGeneratingExam = true
@@ -769,8 +962,16 @@ struct ContentView: View {
                     questionCount: numberOfQuestions
                 )
                 let exam = backendExam.makeExam(for: profile, parentID: parentID)
-                modelContext.insert(exam)
-                try modelContext.save()
+                guard !exam.questions.isEmpty else {
+                    throw APIError.server("The backend did not return any questions. Please try generating the exam again.")
+                }
+                do {
+                    modelContext.insert(exam)
+                    try modelContext.save()
+                } catch {
+                    modelContext.rollback()
+                    throw APIError.server(persistenceMessage(for: error, fallback: "Could not save the generated exam. Please try again."))
+                }
                 isGeneratingExam = false
                 selectedMode = .kid
             } catch {
@@ -786,6 +987,17 @@ struct ContentView: View {
         case "Grade 1": "Grade 1"
         default: "LKG"
         }
+    }
+
+    private func persistenceMessage(for error: Error, fallback: String) -> String {
+        let nsError = error as NSError
+        if let detailedErrors = nsError.userInfo[NSDetailedErrorsKey] as? [NSError], !detailedErrors.isEmpty {
+            return detailedErrors.map { $0.localizedDescription }.joined(separator: "\n")
+        }
+        if nsError.localizedDescription == "Validation failed" {
+            return fallback
+        }
+        return nsError.localizedDescription
     }
 
     private func evaluateExam(exam: Exam, answers: [UUID: String]) -> ExamResult? {
@@ -1270,7 +1482,7 @@ struct KidExamListView: View {
     var body: some View {
         Group {
             if let completedResult {
-                ResultView(result: completedResult)
+                ResultView(result: completedResult, usesKidTheme: true)
             } else if let selectedExam {
                 ExamAttemptView(exam: selectedExam) { exam, answers in
                     if let result = onSubmit(exam, answers) {
@@ -1314,6 +1526,7 @@ struct KidExamListView: View {
         } message: {
             Text("This will remove the kid profile, assigned exams, and exam history for that kid.")
         }
+        .background(KidScholarBackground())
         .sheet(isPresented: $showEditProfileSheet) {
             if let profileBeingEdited {
                 EditKidProfileView(profile: profileBeingEdited, onSave: onUpdateProfile)
@@ -1322,7 +1535,7 @@ struct KidExamListView: View {
     }
 
     private var profilePicker: some View {
-        sectionCard(title: "Choose Your Profile", icon: "figure.child.circle.fill") {
+        kidSectionCard(title: "Choose Your Profile", icon: "figure.child.circle.fill") {
             if profiles.isEmpty {
                 EmptyStateView(icon: "person.crop.circle.badge.questionmark", title: "No kid profiles", message: "Ask a parent to create a profile first.")
             } else {
@@ -1376,7 +1589,7 @@ struct KidExamListView: View {
                             .buttonStyle(.plain)
                         }
                         .padding(12)
-                        .background(isSelected ? Color.green.opacity(0.24) : ScholarTheme.controlSurface)
+                        .background(isSelected ? KidScholarTheme.selectedProfileSurface : KidScholarTheme.profileSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                 }
@@ -1385,13 +1598,13 @@ struct KidExamListView: View {
     }
 
     private var assignedExams: some View {
-        sectionCard(title: "Your Exam Papers", icon: "doc.text.fill") {
+        kidSectionCard(title: "Your Exam Papers", icon: "doc.text.fill") {
             if selectedProfile == nil {
                 EmptyStateView(icon: "hand.tap.fill", title: "Tap your profile", message: "Then your exam papers will appear here.")
             } else if examsForSelectedProfile.isEmpty {
                 VStack(spacing: 14) {
                     EmptyStateView(icon: "doc.badge.clock", title: "No exam assigned", message: "Ask a parent to generate an exam paper for you.")
-                    Button(action: onCreateExam) { Label("Go to Exam Mode", systemImage: "doc.badge.plus").frame(maxWidth: .infinity) }.buttonStyle(CheerfulButtonStyle(color: .teal))
+                    Button(action: onCreateExam) { Label("Go to Exam Mode", systemImage: "doc.badge.plus").frame(maxWidth: .infinity) }.buttonStyle(CheerfulButtonStyle(color: KidScholarTheme.accent))
                 }
             } else {
                 LazyVStack(spacing: 12) { ForEach(examsForSelectedProfile) { exam in Button { selectedExam = exam } label: { ExamStartRow(exam: exam) }.buttonStyle(.plain) } }
@@ -1541,7 +1754,7 @@ struct ExamAttemptView: View {
                                         .multilineTextAlignment(.leading)
                                 }
                                 .padding()
-                                .background(answers[currentQuestion.id] == option ? Color.green.opacity(0.24) : ScholarTheme.controlSurface)
+                                .background(answers[currentQuestion.id] == option ? KidScholarTheme.actionSurface : KidScholarTheme.profileSurface)
                                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                             }
                             .buttonStyle(.plain)
@@ -1549,7 +1762,7 @@ struct ExamAttemptView: View {
                     }
                 }
                 .padding(20)
-                .background(ScholarTheme.surface)
+                .background(KidScholarTheme.cardSurface)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .shadow(color: ScholarTheme.shadow, radius: 12, y: 6)
 
@@ -1563,7 +1776,7 @@ struct ExamAttemptView: View {
                     Button { currentIndex == exam.questions.count - 1 ? onSubmit(exam, answers) : (currentIndex += 1) } label: {
                         Label(currentIndex == exam.questions.count - 1 ? "Submit" : "Next", systemImage: "arrow.right.circle.fill").frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(CheerfulButtonStyle(color: .orange))
+                    .buttonStyle(CheerfulButtonStyle(color: KidScholarTheme.secondaryAccent))
                     .disabled(!currentAnswerIsReady)
                 }
             }
@@ -1571,6 +1784,7 @@ struct ExamAttemptView: View {
             .frame(maxWidth: 860)
             .frame(maxWidth: .infinity)
         }
+        .background(KidScholarBackground())
     }
 }
 
@@ -1641,8 +1855,458 @@ struct ExamHistoryView: View {
     }
 }
 
+struct AIInsightsView: View {
+    let profiles: [ChildProfile]
+    let results: [ExamResult]
+    let cachedInsights: [AIInsight]
+    let apiClient: APIClient
+    let onInsightGenerated: (AIInsightResponseDTO, ChildProfile) -> Void
+    let onUnauthorized: () -> Void
+
+    @State private var selectedProfileID: UUID?
+    @State private var generatedInsight: AIInsightResponseDTO?
+    @State private var isGeneratingInsight = false
+    @State private var insightErrorMessage: String?
+
+    private var selectedProfile: ChildProfile? {
+        guard let selectedProfileID else { return profiles.first }
+        return profiles.first { $0.profileID == selectedProfileID } ?? profiles.first
+    }
+
+    private var selectedResults: [ExamResult] {
+        guard let profileID = selectedProfile?.profileID else { return [] }
+        return results.filter { $0.childProfileID == profileID }
+    }
+
+    private var cachedInsight: AIInsight? {
+        guard let profileID = selectedProfile?.profileID else { return nil }
+        return cachedInsights
+            .filter { $0.childLocalId == profileID }
+            .sorted { $0.generatedAt > $1.generatedAt }
+            .first
+    }
+
+    private var hasNewExamAttemptsAfterCachedInsight: Bool {
+        guard let cachedInsight else { return false }
+        return selectedResults.contains { $0.completedAt > cachedInsight.generatedAt }
+    }
+
+    private var displayedInsight: AIInsightDisplayData? {
+        if let generatedInsight { return AIInsightDisplayData(response: generatedInsight) }
+        if let cachedInsight { return AIInsightDisplayData(insight: cachedInsight) }
+        return nil
+    }
+
+    private var generateButtonTitle: String {
+        if isGeneratingInsight { return "Generating AI Insight..." }
+        return cachedInsight == nil ? "Generate AI Insight" : "Refresh Insight"
+    }
+
+    private var averageScore: Int {
+        selectedResults.isEmpty ? 0 : Int((Double(selectedResults.map(\.percentage).reduce(0, +)) / Double(selectedResults.count)).rounded())
+    }
+
+    private var bestScore: Int {
+        selectedResults.map(\.percentage).max() ?? 0
+    }
+
+    private var recentSubjects: [String] {
+        uniqueValues(selectedResults.sorted { $0.completedAt > $1.completedAt }.map(\.subject)).prefix(4).map { $0 }
+    }
+
+    private var weakTopics: [String] {
+        topicPerformance.filter { $0.score < 70 }.prefix(4).map(\.topic)
+    }
+
+    private var strongTopics: [String] {
+        topicPerformance.filter { $0.score >= 70 }.prefix(4).map(\.topic)
+    }
+
+    private var canGenerateInsight: Bool {
+        selectedResults.count >= 3
+    }
+
+    private var topicPerformance: [TopicPerformance] {
+        topicCounts.map { item in
+            let total = item.correct + item.wrong
+            return TopicPerformance(topic: item.topic, score: total == 0 ? 0 : Int((Double(item.correct) / Double(total) * 100).rounded()))
+        }
+        .sorted { lhs, rhs in
+            if lhs.score == rhs.score { return lhs.topic < rhs.topic }
+            return lhs.score < rhs.score
+        }
+    }
+
+    private var topicCounts: [TopicCountDTO] {
+        topicCounts(for: selectedResults)
+    }
+
+    private var subjectPerformance: [SubjectPerformanceDTO] {
+        Subject.allCases.compactMap { subject in
+            let subjectResults = selectedResults.filter { $0.subject == subject.rawValue }
+            guard !subjectResults.isEmpty else { return nil }
+            let average = Int((Double(subjectResults.map(\.percentage).reduce(0, +)) / Double(subjectResults.count)).rounded())
+            let subjectTopics = topicPerformance(for: subjectResults)
+            return SubjectPerformanceDTO(
+                subject: subject.rawValue,
+                averageScore: average,
+                totalExams: subjectResults.count,
+                strongTopics: subjectTopics.filter { $0.score >= 70 }.prefix(4).map(\.topic),
+                weakTopics: subjectTopics.filter { $0.score < 70 }.prefix(4).map(\.topic)
+            )
+        }
+    }
+
+    private var recentTrend: [RecentTrendDTO] {
+        selectedResults
+            .sorted { $0.completedAt > $1.completedAt }
+            .prefix(8)
+            .map { result in
+                RecentTrendDTO(
+                    subject: result.subject,
+                    percentage: result.percentage,
+                    attemptedAt: iso8601String(from: result.completedAt)
+                )
+            }
+            .reversed()
+    }
+
+    private var insightRequest: AIInsightRequestDTO? {
+        guard let selectedProfile else { return nil }
+        return AIInsightRequestDTO(
+            child: ChildSummaryDTO(age: selectedProfile.age, grade: selectedProfile.grade),
+            period: "all_time",
+            summary: LearningSummaryDTO(
+                totalExams: selectedResults.count,
+                averageScore: averageScore,
+                bestScore: bestScore,
+                subjects: subjectPerformance,
+                topicPerformance: topicCounts,
+                recentTrend: Array(recentTrend)
+            )
+        )
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                sectionCard(title: "AI Insights", icon: "sparkles") {
+                    if profiles.isEmpty {
+                        EmptyStateView(icon: "person.2.slash", title: "No kids yet", message: "Create a kid profile before generating AI insights.")
+                    } else {
+                        VStack(spacing: 14) {
+                            Picker("Kid", selection: selectedProfileBinding) {
+                                ForEach(profiles) { profile in
+                                    Text(profile.name).tag(Optional(profile.profileID))
+                                }
+                            }
+                            .pickerStyle(.menu)
+
+                            insightSummary
+
+                            Label("Only summarized learning performance is sent to generate AI insights. Child exam history remains stored on this device.", systemImage: "lock.shield.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            if hasNewExamAttemptsAfterCachedInsight {
+                                Label("New exam attempts found. Refresh insight for updated analysis.", systemImage: "arrow.clockwise.circle.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.orange)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
+                            if !canGenerateInsight {
+                                Label("Complete at least 3 exams to generate meaningful AI insights.", systemImage: "info.circle.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
+                            if let insightErrorMessage {
+                                Label(insightErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.red)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
+                            Button {
+                                generateAIInsight()
+                            } label: {
+                                Label(generateButtonTitle, systemImage: "sparkles")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(CheerfulButtonStyle(color: .orange))
+                            .disabled(!canGenerateInsight || isGeneratingInsight)
+                        }
+                    }
+                }
+
+                if let displayedInsight {
+                    AIInsightResultView(insight: displayedInsight)
+                }
+            }
+            .padding()
+            .adaptiveContentWidth(maxWidth: 920)
+        }
+        .onAppear(perform: ensureSelectedProfile)
+        .onChange(of: selectedProfileID) { _, _ in generatedInsight = nil }
+    }
+
+    private var selectedProfileBinding: Binding<UUID?> {
+        Binding(
+            get: { selectedProfile?.profileID },
+            set: { selectedProfileID = $0 }
+        )
+    }
+
+    private var insightSummary: some View {
+        VStack(spacing: 14) {
+            HistorySummary(results: selectedResults)
+            insightList(title: "Recent Subjects Practiced", values: recentSubjects, emptyText: "No subjects practiced yet.", color: .teal)
+            insightList(title: "Weak Topics", values: weakTopics, emptyText: "No weak topics found yet.", color: .orange)
+            insightList(title: "Strong Topics", values: strongTopics, emptyText: "No strong topics found yet.", color: .green)
+        }
+    }
+
+    private func insightList(title: String, values: [String], emptyText: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            if values.isEmpty {
+                Text(emptyText)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+            } else {
+                FlowTagList(values: values, color: color)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(color.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func ensureSelectedProfile() {
+        if selectedProfileID == nil || selectedProfile == nil {
+            selectedProfileID = profiles.first?.profileID
+        }
+    }
+
+    private func generateAIInsight() {
+        guard let insightRequest, let selectedProfile, canGenerateInsight else { return }
+        isGeneratingInsight = true
+        insightErrorMessage = nil
+
+        Task {
+            do {
+                let response = try await apiClient.generateAnalyticsInsight(request: insightRequest)
+                generatedInsight = response
+                onInsightGenerated(response, selectedProfile)
+            } catch APIError.unauthorized {
+                onUnauthorized()
+            } catch APIError.tokenLimitExceeded {
+                insightErrorMessage = APIError.tokenLimitExceeded.localizedDescription
+            } catch {
+                insightErrorMessage = "Could not generate AI insight right now. Please try again in a little while."
+            }
+            isGeneratingInsight = false
+        }
+    }
+
+    private func topicCounts(for results: [ExamResult]) -> [TopicCountDTO] {
+        var totals: [String: (correct: Int, wrong: Int)] = [:]
+        for result in results {
+            for evaluation in result.evaluations {
+                let topic = normalizedTopic(evaluation.question.topic)
+                let current = totals[topic] ?? (correct: 0, wrong: 0)
+                totals[topic] = (
+                    correct: current.correct + (evaluation.isCorrect ? 1 : 0),
+                    wrong: current.wrong + (evaluation.isCorrect ? 0 : 1)
+                )
+            }
+        }
+
+        return totals.map { topic, values in
+            TopicCountDTO(topic: topic, correct: values.correct, wrong: values.wrong)
+        }
+        .sorted { lhs, rhs in
+            let lhsTotal = lhs.correct + lhs.wrong
+            let rhsTotal = rhs.correct + rhs.wrong
+            if lhsTotal == rhsTotal { return lhs.topic < rhs.topic }
+            return lhsTotal > rhsTotal
+        }
+    }
+
+    private func topicPerformance(for results: [ExamResult]) -> [TopicPerformance] {
+        topicCounts(for: results).map { item in
+            let total = item.correct + item.wrong
+            return TopicPerformance(topic: item.topic, score: total == 0 ? 0 : Int((Double(item.correct) / Double(total) * 100).rounded()))
+        }
+        .sorted { lhs, rhs in
+            if lhs.score == rhs.score { return lhs.topic < rhs.topic }
+            return lhs.score < rhs.score
+        }
+    }
+
+    private func iso8601String(from date: Date) -> String {
+        ISO8601DateFormatter().string(from: date)
+    }
+
+    private func normalizedTopic(_ topic: String) -> String {
+        let trimmedTopic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedTopic.isEmpty ? "General" : trimmedTopic
+    }
+
+    private func uniqueValues(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var output: [String] = []
+        for value in values where !seen.contains(value) {
+            seen.insert(value)
+            output.append(value)
+        }
+        return output
+    }
+}
+
+struct AIInsightDisplayData {
+    let summary: String
+    let strengths: [String]
+    let needsPractice: [String]
+    let recommendations: [String]
+    let suggestedDifficulty: String
+    let generatedAt: String
+    let tokensUsed: Int
+    let remainingTokens: Int
+
+    init(response: AIInsightResponseDTO) {
+        summary = response.summary
+        strengths = response.strengths
+        needsPractice = response.needsPractice
+        recommendations = response.recommendations
+        suggestedDifficulty = response.suggestedDifficulty
+        generatedAt = response.generatedAt
+        tokensUsed = response.usage?.tokensUsed ?? 0
+        remainingTokens = response.usage?.remainingTokens ?? 0
+    }
+
+    init(insight: AIInsight) {
+        summary = insight.summary
+        strengths = insight.strengths
+        needsPractice = insight.needsPractice
+        recommendations = insight.recommendations
+        suggestedDifficulty = insight.suggestedDifficulty
+        generatedAt = DateFormatter.localizedString(from: insight.generatedAt, dateStyle: .medium, timeStyle: .short)
+        tokensUsed = insight.tokensUsed
+        remainingTokens = insight.remainingTokens
+    }
+}
+
+struct AIInsightResultView: View {
+    let insight: AIInsightDisplayData
+
+    var body: some View {
+        VStack(spacing: 16) {
+            sectionCard(title: "Summary", icon: "lightbulb.fill") {
+                Text(insight.summary)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            sectionCard(title: "Strengths", icon: "star.circle.fill") {
+                InsightValueList(values: insight.strengths, emptyText: "No strengths returned yet.", color: .green)
+            }
+
+            sectionCard(title: "Needs Practice", icon: "target") {
+                InsightValueList(values: insight.needsPractice, emptyText: "No practice areas returned yet.", color: .orange)
+            }
+
+            sectionCard(title: "Recommendations", icon: "checklist") {
+                if insight.recommendations.isEmpty {
+                    Text("No recommendations returned yet.")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(insight.recommendations, id: \.self) { recommendation in
+                            Label(recommendation, systemImage: "checkmark.circle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+
+            sectionCard(title: "Next Step", icon: "arrow.up.forward.circle.fill") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Suggested difficulty: \(insight.suggestedDifficulty)", systemImage: "slider.horizontal.3")
+                        .font(.title3.bold())
+                        .foregroundStyle(.purple)
+                    Text("Generated at: \(insight.generatedAt)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    if insight.tokensUsed > 0 || insight.remainingTokens > 0 {
+                        Text("Tokens used: \(insight.tokensUsed) • Remaining: \(insight.remainingTokens)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+struct InsightValueList: View {
+    let values: [String]
+    let emptyText: String
+    let color: Color
+
+    var body: some View {
+        if values.isEmpty {
+            Text(emptyText)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+        } else {
+            FlowTagList(values: values, color: color)
+        }
+    }
+}
+
+private struct TopicPerformance: Identifiable {
+    let topic: String
+    let score: Int
+
+    var id: String { topic }
+}
+
+struct FlowTagList: View {
+    let values: [String]
+    let color: Color
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], alignment: .leading, spacing: 8) {
+            ForEach(values, id: \.self) { value in
+                Text(value)
+                    .font(.caption.bold())
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .background(color.opacity(0.14))
+                    .clipShape(Capsule())
+            }
+        }
+    }
+}
+
 struct ResultView: View {
     let result: ExamResult
+    var usesKidTheme = false
 
     var body: some View {
         ScrollView {
@@ -1655,16 +2319,22 @@ struct ResultView: View {
                     Text(result.feedback).font(.title3.weight(.medium)).multilineTextAlignment(.center).foregroundStyle(.secondary)
                 }
                 .padding(24)
-                .background(ScholarTheme.surface)
+                .background(usesKidTheme ? KidScholarTheme.cardSurface : ScholarTheme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .shadow(color: ScholarTheme.shadow, radius: 12, y: 6)
-                QuestionReviewList(evaluations: result.evaluations)
+                QuestionReviewList(evaluations: result.evaluations, usesKidTheme: usesKidTheme)
             }
             .padding()
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
         }
-        .background(LittleScholarBackground())
+        .background {
+            if usesKidTheme {
+                KidScholarBackground()
+            } else {
+                LittleScholarBackground()
+            }
+        }
         .navigationTitle("Exam Result")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1672,6 +2342,8 @@ struct ResultView: View {
 
 struct QuestionReviewList: View {
     let evaluations: [AnswerEvaluation]
+    var usesKidTheme = false
+
     var body: some View {
         VStack(spacing: 12) {
             ForEach(evaluations) { item in
@@ -1681,7 +2353,11 @@ struct QuestionReviewList: View {
                     Text("Your answer: \(item.selectedAnswer)").foregroundStyle(item.isCorrect ? .green : .red)
                     if !item.isCorrect { Text("Correct answer: \(item.question.correctAnswer)") }
                     Text(item.question.explanation).font(.subheadline).foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, alignment: .leading).padding().background(ScholarTheme.surface).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(usesKidTheme ? KidScholarTheme.profileSurface : ScholarTheme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
         }
     }
@@ -1721,7 +2397,7 @@ struct HeaderView: View {
                 .accessibilityLabel("Logout")
             }
 
-            Text("Parent setup, exam papers, kid attempts, and history")
+            Text("Parent setup, exam papers, kid attempts, performance, and AI insights")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -1856,7 +2532,7 @@ struct LatestResultBanner: View {
 struct HistorySummary: View {
     let results: [ExamResult]
     private var average: Int { results.isEmpty ? 0 : Int((Double(results.map(\.percentage).reduce(0, +)) / Double(results.count)).rounded()) }
-    var body: some View { HStack(spacing: 12) { SummaryTile(title: "Exams", value: "\(results.count)", color: .orange); SummaryTile(title: "Average", value: "\(average)%", color: .teal); SummaryTile(title: "Best", value: "\(results.map(\.percentage).max() ?? 0)%", color: .pink) } }
+    var body: some View { HStack(spacing: 12) { SummaryTile(title: "Exams Taken", value: "\(results.count)", color: .orange); SummaryTile(title: "Average", value: "\(average)%", color: .teal); SummaryTile(title: "Best", value: "\(results.map(\.percentage).max() ?? 0)%", color: .pink) } }
 }
 
 struct SummaryTile: View {
@@ -1864,95 +2540,6 @@ struct SummaryTile: View {
     let value: String
     let color: Color
     var body: some View { VStack(spacing: 6) { Text(value).font(.title2.bold()).foregroundStyle(color); Text(title).font(.caption.bold()).foregroundStyle(.secondary) }.frame(maxWidth: .infinity).padding(.vertical, 14).background(color.opacity(0.12)).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)) }
-}
-
-struct CheerfulButtonStyle: ButtonStyle {
-    let color: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        CheerfulButton(label: configuration.label, color: color, isPressed: configuration.isPressed)
-    }
-
-    private struct CheerfulButton<Label: View>: View {
-        @Environment(\.isEnabled) private var isEnabled
-
-        let label: Label
-        let color: Color
-        let isPressed: Bool
-
-        var body: some View {
-            label
-                .font(.title3.bold())
-                .foregroundStyle(.white)
-                .padding(.vertical, 16)
-                .padding(.horizontal, 18)
-                .background(isEnabled ? color.opacity(isPressed ? 0.72 : 1) : Color.gray.opacity(0.45))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .scaleEffect(isPressed && isEnabled ? 0.97 : 1)
-                .opacity(isEnabled ? 1 : 0.62)
-        }
-    }
-}
-
-struct LittleScholarBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var gradientColors: [Color] {
-        if colorScheme == .dark {
-            return [
-                Color.indigo.opacity(0.30),
-                Color.teal.opacity(0.18),
-                Color.purple.opacity(0.24)
-            ]
-        }
-        return [
-            Color.yellow.opacity(0.28),
-            Color.cyan.opacity(0.22),
-            Color.pink.opacity(0.18)
-        ]
-    }
-
-    var body: some View {
-        LinearGradient(colors: gradientColors, startPoint: .topLeading, endPoint: .bottomTrailing)
-            .background(Color(uiColor: .systemGroupedBackground))
-            .ignoresSafeArea()
-    }
-}
-
-@ViewBuilder
-func sectionCard<Content: View>(title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
-    VStack(alignment: .leading, spacing: 16) {
-        Label(title, systemImage: icon)
-            .font(.title2.bold())
-            .foregroundStyle(.primary)
-        content()
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(20)
-    .background(ScholarTheme.surface)
-    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-    .shadow(color: ScholarTheme.shadow, radius: 12, y: 6)
-}
-
-func row(icon: String, title: String, subtitle: String, color: Color) -> some View {
-    HStack(spacing: 12) {
-        Image(systemName: icon)
-            .font(.title)
-            .foregroundStyle(color)
-            .frame(width: 42)
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(.primary)
-            Text(subtitle)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-        }
-        Spacer()
-    }
-    .padding()
-    .background(ScholarTheme.controlSurface)
-    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 }
 
 private extension View {
@@ -1964,5 +2551,5 @@ private extension View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [ChildProfile.self, Exam.self, ExamResult.self], inMemory: true)
+        .modelContainer(for: [ChildProfile.self, Exam.self, ExamResult.self, AIInsight.self], inMemory: true)
 }
