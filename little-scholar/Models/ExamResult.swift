@@ -1,10 +1,10 @@
 import Foundation
-import SwiftData
 
-@Model
-final class ExamResult {
+final class ExamResult: Identifiable {
+    let id = UUID()
     var parentID: String = ""
     var childProfileID: UUID = UUID()
+    var childBackendID: String = ""
     var childName: String = ""
     var grade: String = "Grade 1"
     var subject: String = Subject.math.rawValue
@@ -17,6 +17,7 @@ final class ExamResult {
     init(
         parentID: String = "",
         childProfileID: UUID,
+        childBackendID: String = "",
         childName: String,
         grade: String,
         subject: String,
@@ -28,6 +29,7 @@ final class ExamResult {
     ) {
         self.parentID = parentID
         self.childProfileID = childProfileID
+        self.childBackendID = childBackendID
         self.childName = childName
         self.grade = grade
         self.subject = subject

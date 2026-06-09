@@ -12,6 +12,7 @@ struct AnswerEvaluationService {
 
         return ExamResult(
             childProfileID: exam.childProfileID,
+            childBackendID: exam.childBackendID,
             childName: exam.childName,
             grade: exam.grade,
             subject: exam.subject,
