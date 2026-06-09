@@ -1,9 +1,9 @@
 import Foundation
-import SwiftData
 
-@Model
-final class ChildProfile {
+final class ChildProfile: Identifiable {
+    var id: UUID { profileID }
     var profileID: UUID = UUID()
+    var backendID: String = ""
     var parentID: String = ""
     var name: String = ""
     var age: Int = 6
@@ -11,8 +11,9 @@ final class ChildProfile {
     var avatar: String = KidAvatar.unicorn.rawValue
     var createdAt: Date = Date.now
 
-    init(profileID: UUID = UUID(), parentID: String = "", name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
+    init(profileID: UUID = UUID(), backendID: String = "", parentID: String = "", name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
         self.profileID = profileID
+        self.backendID = backendID
         self.parentID = parentID
         self.name = name
         self.age = age

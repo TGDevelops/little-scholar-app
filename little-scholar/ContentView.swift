@@ -5,14 +5,13 @@
 //  Created by Tejesh on 26/05/26.
 //
 
-import CoreData
 import Foundation
-import SwiftData
 import SwiftUI
 
-@Model
-final class ChildProfile {
+final class ChildProfile: Identifiable {
+    var id: UUID { profileID }
     var profileID: UUID = UUID()
+    var backendID: String = ""
     var parentID: String = ""
     var name: String = ""
     var age: Int = 6
@@ -20,8 +19,9 @@ final class ChildProfile {
     var avatar: String = KidAvatar.unicorn.rawValue
     var createdAt: Date = Date.now
 
-    init(profileID: UUID = UUID(), parentID: String = "", name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
+    init(profileID: UUID = UUID(), backendID: String = "", parentID: String = "", name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
         self.profileID = profileID
+        self.backendID = backendID
         self.parentID = parentID
         self.name = name
         self.age = age
@@ -31,11 +31,12 @@ final class ChildProfile {
     }
 }
 
-@Model
-final class Exam {
+final class Exam: Identifiable {
+    var id: UUID { examID }
     var examID: UUID = UUID()
     var parentID: String = ""
     var childProfileID: UUID = UUID()
+    var childBackendID: String = ""
     var childName: String = ""
     var grade: String = "Grade 1"
     var subject: String = Subject.maths.rawValue
@@ -44,9 +45,10 @@ final class Exam {
     var isCompleted: Bool = false
     var questions: [Question] = []
 
-    init(parentID: String = "", childProfileID: UUID, childName: String, grade: String, subject: Subject, difficulty: Difficulty, questions: [Question]) {
+    init(parentID: String = "", childProfileID: UUID, childBackendID: String = "", childName: String, grade: String, subject: Subject, difficulty: Difficulty, questions: [Question]) {
         self.parentID = parentID
         self.childProfileID = childProfileID
+        self.childBackendID = childBackendID
         self.childName = childName
         self.grade = grade
         self.subject = subject.rawValue
@@ -55,8 +57,7 @@ final class Exam {
     }
 }
 
-@Model
-final class AIInsight {
+final class AIInsight: Identifiable {
     var id: String = UUID().uuidString
     var parentID: String = ""
     var childLocalId: UUID = UUID()
@@ -96,10 +97,11 @@ final class AIInsight {
     }
 }
 
-@Model
-final class ExamResult {
+final class ExamResult: Identifiable {
+    let id: UUID = UUID()
     var parentID: String = ""
     var childProfileID: UUID = UUID()
+    var childBackendID: String = ""
     var childName: String = ""
     var grade: String = "Grade 1"
     var subject: String = Subject.maths.rawValue
@@ -109,9 +111,10 @@ final class ExamResult {
     var completedAt: Date = Date.now
     var evaluations: [AnswerEvaluation] = []
 
-    init(parentID: String = "", childProfileID: UUID, childName: String, grade: String, subject: String, difficulty: String, totalQuestions: Int, correctAnswers: Int, evaluations: [AnswerEvaluation]) {
+    init(parentID: String = "", childProfileID: UUID, childBackendID: String = "", childName: String, grade: String, subject: String, difficulty: String, totalQuestions: Int, correctAnswers: Int, evaluations: [AnswerEvaluation]) {
         self.parentID = parentID
         self.childProfileID = childProfileID
+        self.childBackendID = childBackendID
         self.childName = childName
         self.grade = grade
         self.subject = subject
@@ -303,8 +306,23 @@ enum KidAvatar: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    var backendAvatarURLString: String? {
+        "https://little-scholar.app/avatar/\(rawValue.lowercased().replacingOccurrences(of: " ", with: "-"))"
+    }
+
     static func avatar(for rawValue: String) -> KidAvatar {
         KidAvatar(rawValue: rawValue) ?? .unicorn
+    }
+
+    static func avatar(forBackendURL avatarURL: String?) -> KidAvatar {
+        guard let avatarURL else { return .unicorn }
+        let normalizedValue = avatarURL
+            .split(separator: "/")
+            .last
+            .map(String.init)?
+            .replacingOccurrences(of: "-", with: " ")
+            .lowercased() ?? ""
+        return allCases.first { $0.rawValue.lowercased() == normalizedValue } ?? .unicorn
     }
 }
 
@@ -328,54 +346,6 @@ enum AppMode: String, CaseIterable, Identifiable {
     }
 }
 
-struct ExamGeneratorService {
-    func generateExam(for profile: ChildProfile, subject: Subject, difficulty: Difficulty, numberOfQuestions: Int) -> Exam {
-        Exam(
-            childProfileID: profile.profileID,
-            childName: profile.name,
-            grade: profile.grade,
-            subject: subject,
-            difficulty: difficulty,
-            questions: questions(subject: subject, difficulty: difficulty, count: numberOfQuestions)
-        )
-    }
-
-    private func questions(subject: Subject, difficulty: Difficulty, count: Int) -> [Question] {
-        let source: [Question]
-        switch subject {
-        case .maths:
-            source = [
-                Question(prompt: "What is 2 + 3?", options: ["4", "5", "6", "7"], correctAnswer: "5", explanation: "Counting 2 more after 3 gives 5."),
-                Question(prompt: "What is 8 x 4?", options: ["24", "28", "32", "36"], correctAnswer: "32", explanation: "8 groups of 4 make 32."),
-                Question(prompt: "How many tens are in 40?", options: ["2", "3", "4", "5"], correctAnswer: "4", explanation: "40 is 4 groups of ten.")
-            ]
-        case .english, .hindi:
-            source = [
-                Question(prompt: "Which word rhymes with cat?", options: ["bat", "dog", "sun", "pen"], correctAnswer: "bat", explanation: "Cat and bat end with the same sound."),
-                Question(prompt: "Choose the noun.", options: ["run", "happy", "ball", "blue"], correctAnswer: "ball", explanation: "A noun names a thing. Ball is a thing."),
-                Question(prompt: "What is the opposite of cold?", options: ["hot", "wet", "slow", "small"], correctAnswer: "hot", explanation: "Hot is the opposite of cold.")
-            ]
-        case .evs:
-            source = [
-                Question(prompt: "What do plants need to grow?", options: ["Sunlight", "Shoes", "Pencils", "Blankets"], correctAnswer: "Sunlight", explanation: "Plants use sunlight to make food."),
-                Question(prompt: "What is water when it freezes?", options: ["Steam", "Ice", "Cloud", "Rain"], correctAnswer: "Ice", explanation: "Frozen water becomes ice."),
-                Question(prompt: "What force pulls objects toward Earth?", options: ["Sound", "Gravity", "Light", "Heat"], correctAnswer: "Gravity", explanation: "Gravity pulls objects toward Earth.")
-            ]
-        case .gk:
-            source = [
-                Question(prompt: "How many days are in a week?", options: ["5", "6", "7", "8"], correctAnswer: "7", explanation: "There are 7 days in one week."),
-                Question(prompt: "Which place has many books?", options: ["Library", "Pool", "Garden", "Kitchen"], correctAnswer: "Library", explanation: "A library stores books."),
-                Question(prompt: "Which tool tells direction?", options: ["Compass", "Clock", "Ruler", "Thermometer"], correctAnswer: "Compass", explanation: "A compass points toward directions like north.")
-            ]
-        }
-
-        let repeats = max(1, Int(ceil(Double(count) / Double(source.count))))
-        return Array(Array(repeating: source, count: repeats).flatMap { $0 }.prefix(count)).map {
-            Question(prompt: $0.prompt, options: $0.options, correctAnswer: $0.correctAnswer, explanation: $0.explanation)
-        }
-    }
-}
-
 struct AnswerEvaluationService {
     func evaluate(exam: Exam, answers: [UUID: String]) -> ExamResult {
         let evaluations = exam.questions.map { question in
@@ -384,6 +354,7 @@ struct AnswerEvaluationService {
 
         return ExamResult(
             childProfileID: exam.childProfileID,
+            childBackendID: exam.childBackendID,
             childName: exam.childName,
             grade: exam.grade,
             subject: exam.subject,
@@ -400,6 +371,7 @@ enum APIError: LocalizedError {
     case invalidResponse
     case unauthorized
     case tokenLimitExceeded
+    case decoding(String)
     case server(String)
 
     var errorDescription: String? {
@@ -408,6 +380,7 @@ enum APIError: LocalizedError {
         case .invalidResponse: "The backend returned an invalid response."
         case .unauthorized: "Your session has expired. Please login again."
         case .tokenLimitExceeded: "AI insight limit reached. Please try again later or upgrade when subscriptions are available."
+        case .decoding(let message): message
         case .server(let message): message
         }
     }
@@ -434,16 +407,76 @@ struct APIClient {
         try await post(path: "/api/auth/login", body: LoginRequestDTO(email: email, password: password), authorized: false)
     }
 
-    func generateExam(grade: String, subject: Subject, difficulty: Difficulty, questionCount: Int) async throws -> BackendExamPaperDTO {
+    func generateExam(childId: String, grade: String, subject: Subject, difficulty: Difficulty, questionCount: Int) async throws -> BackendExamPaperDTO {
         try await post(
             path: "/api/exams/generate",
-            body: GenerateExamRequestDTO(grade: grade, subject: subject.rawValue, difficulty: difficulty.rawValue, questionCount: questionCount),
+            body: GenerateExamRequestDTO(childId: childId, grade: grade, subject: subject.rawValue, difficulty: difficulty.rawValue, questionCount: questionCount),
             authorized: true
         )
     }
 
     func generateAnalyticsInsight(request: AIInsightRequestDTO) async throws -> AIInsightResponseDTO {
         try await post(path: "/api/analytics/generate", body: request, authorized: true)
+    }
+
+    func listChildren() async throws -> [ChildProfileDTO] {
+        try await get(path: "/api/children", authorized: true)
+    }
+
+    func createChild(name: String, age: Int, grade: String, avatar: KidAvatar) async throws -> ChildProfileDTO {
+        try await post(
+            path: "/api/children",
+            body: ChildProfileRequestDTO(name: name, age: age, grade: grade, avatarUrl: avatar.backendAvatarURLString),
+            authorized: true
+        )
+    }
+
+    func updateChild(id: String, name: String, age: Int, grade: String, avatar: KidAvatar) async throws -> ChildProfileDTO {
+        try await put(
+            path: "/api/children/\(id)",
+            body: ChildProfileUpdateRequestDTO(name: name, age: age, grade: grade, avatarUrl: avatar.backendAvatarURLString),
+            authorized: true
+        )
+    }
+
+    func deleteChild(id: String) async throws -> DeleteResponseDTO {
+        try await delete(path: "/api/children/\(id)", authorized: true)
+    }
+
+    func createExamAttempt(_ request: CreateExamAttemptRequestDTO) async throws -> ExamAttemptDTO {
+        try await post(path: "/api/exam-attempts", body: request, authorized: true)
+    }
+
+    private func get<Response: Decodable>(path: String, authorized: Bool) async throws -> Response {
+        let endpoint = try baseURL.appending(path: path)
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "GET"
+        if authorized, let accessToken, !accessToken.isEmpty {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        return try await send(request)
+    }
+
+    private func put<Request: Encodable, Response: Decodable>(path: String, body: Request, authorized: Bool) async throws -> Response {
+        let endpoint = try baseURL.appending(path: path)
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if authorized, let accessToken, !accessToken.isEmpty {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = try JSONEncoder().encode(body)
+        return try await send(request)
+    }
+
+    private func delete<Response: Decodable>(path: String, authorized: Bool) async throws -> Response {
+        let endpoint = try baseURL.appending(path: path)
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "DELETE"
+        if authorized, let accessToken, !accessToken.isEmpty {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        return try await send(request)
     }
 
     private func post<Request: Encodable, Response: Decodable>(path: String, body: Request, authorized: Bool) async throws -> Response {
@@ -456,19 +489,27 @@ struct APIClient {
         }
         request.httpBody = try JSONEncoder().encode(body)
 
+        return try await send(request)
+    }
+
+    private func send<Response: Decodable>(_ request: URLRequest) async throws -> Response {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(httpResponse.statusCode) else {
             let errorResponse = try? JSONDecoder().decode(ErrorResponseDTO.self, from: data)
-            let message = errorResponse?.error.message ?? "Request failed with status \(httpResponse.statusCode)."
+            let message = errorResponse?.error.displayMessage ?? "Request failed with status \(httpResponse.statusCode)."
             if httpResponse.statusCode == 401 { throw APIError.unauthorized }
             if httpResponse.statusCode == 429 || message.localizedCaseInsensitiveContains("token") || message.localizedCaseInsensitiveContains("limit") {
                 throw APIError.tokenLimitExceeded
             }
             throw APIError.server(message)
         }
-        let success = try JSONDecoder().decode(APISuccessResponse<Response>.self, from: data)
-        return success.data
+        do {
+            let success = try JSONDecoder().decode(APISuccessResponse<Response>.self, from: data)
+            return success.data
+        } catch {
+            throw APIError.decoding("Could not read the backend login response. Please try again.")
+        }
     }
 }
 
@@ -478,8 +519,83 @@ struct APISuccessResponse<DataPayload: Decodable>: Decodable {
 }
 
 struct ErrorResponseDTO: Decodable {
-    struct APIErrorPayload: Decodable { let message: String }
-    let success: Bool
+    struct APIErrorPayload: Decodable {
+        let message: String
+        let details: [ValidationDetail]
+
+        enum CodingKeys: String, CodingKey {
+            case message
+            case details
+            case errors
+            case issues
+        }
+
+        init(from decoder: Decoder) throws {
+            if let container = try? decoder.singleValueContainer(), let message = try? container.decode(String.self) {
+                self.message = message
+                self.details = []
+                return
+            }
+
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            message = try container.decodeIfPresent(String.self, forKey: .message) ?? "Request failed."
+            details = (try? container.decodeIfPresent([ValidationDetail].self, forKey: .details))
+                ?? (try? container.decodeIfPresent([ValidationDetail].self, forKey: .errors))
+                ?? (try? container.decodeIfPresent([ValidationDetail].self, forKey: .issues))
+                ?? (try? container.decodeIfPresent(ValidationDetail.self, forKey: .details)).map { [$0] }
+                ?? (try? container.decodeIfPresent(String.self, forKey: .details)).map { [ValidationDetail(message: $0)] }
+                ?? []
+        }
+
+        var displayMessage: String {
+            let detailMessages = details.map(\.displayMessage).filter { !$0.isEmpty }
+            guard !detailMessages.isEmpty else { return message }
+            return "\(message): \(detailMessages.joined(separator: ", "))"
+        }
+    }
+
+    struct ValidationDetail: Decodable {
+        let field: String?
+        let message: String
+
+        init(field: String? = nil, message: String) {
+            self.field = field
+            self.message = message
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case field
+            case path
+            case param
+            case message
+            case msg
+        }
+
+        init(from decoder: Decoder) throws {
+            if let container = try? decoder.singleValueContainer(), let message = try? container.decode(String.self) {
+                self.field = nil
+                self.message = message
+                return
+            }
+
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            field = (try? container.decodeIfPresent(String.self, forKey: .field))
+                ?? (try? container.decodeIfPresent(String.self, forKey: .path))
+                ?? (try? container.decodeIfPresent([String].self, forKey: .path))?.joined(separator: ".")
+                ?? (try? container.decodeIfPresent(String.self, forKey: .param))
+            message = (try? container.decodeIfPresent(String.self, forKey: .message))
+                ?? (try? container.decodeIfPresent(String.self, forKey: .msg))
+                ?? ""
+        }
+
+        var displayMessage: String {
+            guard let field, !field.isEmpty else { return message }
+            guard !message.isEmpty else { return field }
+            return "\(field) \(message)"
+        }
+    }
+
+    let success: Bool?
     let error: APIErrorPayload
 }
 
@@ -496,6 +612,7 @@ struct LoginRequestDTO: Encodable {
 }
 
 struct GenerateExamRequestDTO: Encodable {
+    let childId: String
     let grade: String
     let subject: String
     let difficulty: String
@@ -503,9 +620,8 @@ struct GenerateExamRequestDTO: Encodable {
 }
 
 struct AIInsightRequestDTO: Encodable {
-    let child: ChildSummaryDTO
+    let childId: String
     let period: String
-    let summary: LearningSummaryDTO
 }
 
 struct ChildSummaryDTO: Encodable {
@@ -542,25 +658,121 @@ struct RecentTrendDTO: Encodable {
     let attemptedAt: String
 }
 
+struct ChildProfileRequestDTO: Encodable {
+    let name: String
+    let age: Int
+    let grade: String
+    let avatarUrl: String?
+}
+
+struct ChildProfileUpdateRequestDTO: Encodable {
+    let name: String
+    let age: Int
+    let grade: String
+    let avatarUrl: String?
+}
+
+struct ChildProfileDTO: Decodable {
+    let id: String
+    let userId: String
+    let name: String
+    let age: Int
+    let grade: String
+    let avatarUrl: String?
+    let createdAt: String
+    let updatedAt: String
+
+    var modelID: UUID { UUID(uuidString: id) ?? UUID() }
+    var avatar: KidAvatar { KidAvatar.avatar(forBackendURL: avatarUrl) }
+}
+
+struct DeleteResponseDTO: Decodable {
+    let deleted: Bool
+}
+
+struct CreateExamAttemptRequestDTO: Encodable {
+    let childId: String
+    let examId: String?
+    let grade: String
+    let subject: String
+    let difficulty: String
+    let questionCount: Int
+    let correctAnswers: Int
+    let totalMarks: Int
+    let earnedMarks: Int
+    let scorePercentage: Double
+    let timeSpentSeconds: Int?
+    let answers: [AttemptAnswerDTO]?
+    let strongTopics: [String]
+    let weakTopics: [String]
+    let attemptedAt: String
+}
+
+struct AttemptAnswerDTO: Encodable {
+    let questionId: String
+    let selectedAnswer: String
+    let isCorrect: Bool
+    let topic: String
+}
+
+struct ExamAttemptDTO: Decodable {
+    let id: String
+    let userId: String?
+    let childId: String?
+    let examId: String?
+    let grade: String?
+    let subject: String?
+    let difficulty: String?
+    let questionCount: Int?
+    let correctAnswers: Int?
+    let totalMarks: Int?
+    let earnedMarks: Int?
+    let scorePercentage: Double?
+    let timeSpentSeconds: Int?
+    let strongTopics: [String]?
+    let weakTopics: [String]?
+    let attemptedAt: String?
+    let createdAt: String?
+    let updatedAt: String?
+}
+
 struct AIInsightResponseDTO: Decodable {
-    let insightId: String
+    let id: String
+    let userId: String?
+    let childId: String?
+    let period: String?
     let summary: String
     let strengths: [String]
     let needsPractice: [String]
     let recommendations: [String]
     let suggestedDifficulty: String
-    let generatedAt: String
+    let createdAt: String
     let usage: AIInsightUsageDTO?
 }
 
 struct AIInsightUsageDTO: Decodable {
     let tokensUsed: Int
     let remainingTokens: Int
+    let monthlyLimit: Int
 }
 
 struct AuthPayloadDTO: Decodable {
     let user: UserDTO
     let accessToken: String
+
+    enum CodingKeys: String, CodingKey {
+        case user
+        case accessToken
+        case token
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        user = try container.decode(UserDTO.self, forKey: .user)
+        accessToken = try container.decodeIfPresent(String.self, forKey: .accessToken)
+            ?? container.decodeIfPresent(String.self, forKey: .token)
+            ?? ""
+    }
 }
 
 struct UserDTO: Decodable {
@@ -568,15 +780,41 @@ struct UserDTO: Decodable {
     let name: String
     let email: String
     let city: String
+    let plan: String?
+    let createdAt: String?
+    let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case email
+        case city
+        case plan
+        case createdAt
+        case updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Parent"
+        email = try container.decodeIfPresent(String.self, forKey: .email) ?? ""
+        city = try container.decodeIfPresent(String.self, forKey: .city) ?? ""
+        plan = try container.decodeIfPresent(String.self, forKey: .plan)
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+    }
 }
 
 struct BackendExamPaperDTO: Decodable {
     let examId: String
+    let childId: String?
     let grade: String
     let subject: String
     let difficulty: String
     let questionCount: Int
     let questions: [BackendQuestionDTO]
+    let usage: AIInsightUsageDTO?
 
     func makeExam(for profile: ChildProfile, parentID: String) -> Exam {
         let subjectValue = Subject(rawValue: subject) ?? .maths
@@ -585,6 +823,7 @@ struct BackendExamPaperDTO: Decodable {
         let exam = Exam(
             parentID: parentID,
             childProfileID: profile.profileID,
+            childBackendID: profile.backendID,
             childName: profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Little Scholar" : profile.name,
             grade: profile.grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? grade : profile.grade,
             subject: subjectValue,
@@ -662,21 +901,17 @@ enum FlexibleAnswer: Decodable {
 }
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \ChildProfile.createdAt, order: .reverse) private var profiles: [ChildProfile]
-    @Query(sort: \Exam.createdAt, order: .reverse) private var exams: [Exam]
-    @Query(sort: \ExamResult.completedAt, order: .reverse) private var results: [ExamResult]
-    @Query(sort: \AIInsight.generatedAt, order: .reverse) private var aiInsights: [AIInsight]
-
-    @AppStorage("apiBaseURL") private var apiBaseURL = "https://little-scholar-server-production.up.railway.app"
-    @AppStorage("parentID") private var parentID = ""
-    @AppStorage("parentName") private var parentName = ""
-    @AppStorage("parentEmail") private var parentEmail = ""
-    @AppStorage("parentCity") private var parentCity = ""
-    @AppStorage("parentAccessToken") private var parentAccessToken = ""
-    @AppStorage("parentIsRegistered") private var parentIsRegistered = false
-    @AppStorage("parentIsLoggedIn") private var parentIsLoggedIn = false
-
+    @State private var profiles: [ChildProfile] = []
+    @State private var exams: [Exam] = []
+    @State private var results: [ExamResult] = []
+    @State private var apiBaseURL = "https://little-scholar-server-production.up.railway.app"
+    @State private var parentID = ""
+    @State private var parentName = ""
+    @State private var parentEmail = ""
+    @State private var parentCity = ""
+    @State private var parentAccessToken = ""
+    @State private var parentIsRegistered = false
+    @State private var parentIsLoggedIn = false
     @State private var selectedMode: AppMode = .parent
     @State private var latestResult: ExamResult?
     @State private var saveErrorMessage: String?
@@ -700,6 +935,7 @@ struct ContentView: View {
                     ParentLoginView(
                         registeredEmail: parentEmail,
                         parentName: parentName.isEmpty ? "Parent" : parentName,
+                        errorMessage: saveErrorMessage,
                         onLogin: loginParent,
                         onRegisterAgain: {
                             showingLogin = false
@@ -722,9 +958,9 @@ struct ContentView: View {
             }
             .task {
                 migrateBackendURLIfNeeded()
-                migrateLegacyRecordsToCurrentParentIfNeeded()
-                repairDuplicateProfileIDs()
-                removeInvalidPendingExams()
+                if parentIsLoggedIn {
+                    await refreshChildrenFromBackend()
+                }
             }
         }
     }
@@ -761,9 +997,9 @@ struct ContentView: View {
             AIInsightsView(
                 profiles: currentParentProfiles,
                 results: currentParentResults,
-                cachedInsights: currentParentAIInsights,
+                cachedInsights: [],
                 apiClient: apiClient,
-                onInsightGenerated: saveAIInsight,
+                onInsightGenerated: { _, _ in },
                 onUnauthorized: handleUnauthorizedSession
             )
         }
@@ -785,15 +1021,12 @@ struct ContentView: View {
         results.filter { $0.parentID == parentID }
     }
 
-    private var currentParentAIInsights: [AIInsight] {
-        aiInsights.filter { $0.parentID == parentID }
-    }
-
     private var displayableExams: [Exam] {
         currentParentExams.filter { !$0.questions.isEmpty }
     }
 
     private func registerParent(name: String, email: String, city: String, password: String) async -> Bool {
+        saveErrorMessage = nil
         do {
             let payload = try await apiClient.register(
                 name: name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -801,8 +1034,7 @@ struct ContentView: View {
                 city: city.trimmingCharacters(in: .whitespacesAndNewlines),
                 password: password
             )
-            saveAuthenticatedParent(payload)
-            return true
+            return saveAuthenticatedParent(payload)
         } catch {
             saveErrorMessage = error.localizedDescription
             return false
@@ -810,29 +1042,41 @@ struct ContentView: View {
     }
 
     private func loginParent(email: String, password: String) async -> Bool {
+        saveErrorMessage = nil
         do {
             let payload = try await apiClient.login(
                 email: email.trimmingCharacters(in: .whitespacesAndNewlines),
                 password: password
             )
-            saveAuthenticatedParent(payload)
-            return true
+            return saveAuthenticatedParent(payload)
         } catch {
             saveErrorMessage = error.localizedDescription
             return false
         }
     }
 
-    private func saveAuthenticatedParent(_ payload: AuthPayloadDTO) {
+    @discardableResult
+    private func saveAuthenticatedParent(_ payload: AuthPayloadDTO) -> Bool {
+        let accessToken = payload.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let userID = payload.user.id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !accessToken.isEmpty, !userID.isEmpty else {
+            saveErrorMessage = "Login response was missing account details. Please try again."
+            return false
+        }
+
         parentID = payload.user.id
         parentName = payload.user.name
         parentEmail = payload.user.email
         parentCity = payload.user.city
-        parentAccessToken = payload.accessToken
+        parentAccessToken = accessToken
         latestResult = nil
         selectedMode = .parent
         parentIsRegistered = true
         parentIsLoggedIn = true
+
+        let authenticatedClient = APIClient(baseURLString: apiBaseURL, accessToken: accessToken)
+        Task { await refreshChildrenFromBackend(using: authenticatedClient) }
+        return true
     }
 
     private func resetParentRegistration() {
@@ -850,96 +1094,201 @@ struct ContentView: View {
     private func saveProfile(name: String, age: Int, grade: String, avatar: KidAvatar) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
-        do {
-            modelContext.insert(ChildProfile(parentID: parentID, name: trimmedName, age: age, grade: grade, avatar: avatar))
-            try modelContext.save()
-        } catch {
-            saveErrorMessage = error.localizedDescription
+
+        Task {
+            do {
+                let child = try await apiClient.createChild(name: trimmedName, age: age, grade: backendGrade(for: grade), avatar: avatar)
+                upsertChildProfile(from: child)
+            } catch APIError.unauthorized {
+                handleUnauthorizedSession()
+            } catch {
+                saveErrorMessage = error.localizedDescription
+            }
         }
     }
 
     private func deleteProfile(_ profile: ChildProfile) {
         guard profile.parentID == parentID else { return }
+        let backendID = backendChildID(for: profile)
+        guard !backendID.isEmpty else {
+            saveErrorMessage = "This child profile is missing its backend ID. Refresh kids and try again."
+            return
+        }
 
-        do {
-            let profileID = profile.profileID
-            for exam in currentParentExams where exam.childProfileID == profileID {
-                modelContext.delete(exam)
+        Task {
+            do {
+                _ = try await apiClient.deleteChild(id: backendID)
+                deleteProfileLocally(profile)
+            } catch APIError.unauthorized {
+                handleUnauthorizedSession()
+            } catch {
+                saveErrorMessage = error.localizedDescription
             }
-            for result in currentParentResults where result.childProfileID == profileID {
-                modelContext.delete(result)
-            }
-            for insight in currentParentAIInsights where insight.childLocalId == profileID {
-                modelContext.delete(insight)
-            }
-            if latestResult?.childProfileID == profileID {
-                latestResult = nil
-            }
-            modelContext.delete(profile)
-            try modelContext.save()
-        } catch {
-            saveErrorMessage = error.localizedDescription
         }
     }
 
     private func updateProfile(_ profile: ChildProfile, name: String, age: Int, grade: String, avatar: KidAvatar) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard profile.parentID == parentID, !trimmedName.isEmpty else { return }
+        let backendID = backendChildID(for: profile)
+        guard !backendID.isEmpty else {
+            saveErrorMessage = "This child profile is missing its backend ID. Refresh kids and try again."
+            return
+        }
 
+        Task {
+            do {
+                let child = try await apiClient.updateChild(id: backendID, name: trimmedName, age: age, grade: backendGrade(for: grade), avatar: avatar)
+                upsertChildProfile(from: child)
+                updateLocalChildReferences(profileID: profile.profileID, name: child.name)
+            } catch APIError.unauthorized {
+                handleUnauthorizedSession()
+            } catch {
+                saveErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func refreshChildrenFromBackend(using client: APIClient? = nil) async {
         do {
-            let profileID = profile.profileID
-            profile.name = trimmedName
-            profile.age = age
-            profile.grade = grade
-            profile.avatar = avatar.rawValue
-
-            for exam in currentParentExams where exam.childProfileID == profileID {
-                exam.childName = trimmedName
-            }
-            for result in currentParentResults where result.childProfileID == profileID {
-                result.childName = trimmedName
-            }
-            try modelContext.save()
+            let remoteChildren = try await (client ?? apiClient).listChildren()
+            syncChildProfiles(remoteChildren)
+        } catch APIError.unauthorized {
+            handleUnauthorizedSession()
         } catch {
             saveErrorMessage = error.localizedDescription
         }
     }
 
-    private func saveAIInsight(_ response: AIInsightResponseDTO, for profile: ChildProfile) {
-        guard profile.parentID == parentID else { return }
-        let generatedAt = ISO8601DateFormatter().date(from: response.generatedAt) ?? .now
-        let existingInsight = currentParentAIInsights.first { $0.childLocalId == profile.profileID }
-
-        do {
-            if let existingInsight {
-                existingInsight.id = response.insightId
-                existingInsight.summary = response.summary
-                existingInsight.strengths = response.strengths
-                existingInsight.needsPractice = response.needsPractice
-                existingInsight.recommendations = response.recommendations
-                existingInsight.suggestedDifficulty = response.suggestedDifficulty
-                existingInsight.tokensUsed = response.usage?.tokensUsed ?? 0
-                existingInsight.remainingTokens = response.usage?.remainingTokens ?? 0
-                existingInsight.generatedAt = generatedAt
-            } else {
-                modelContext.insert(AIInsight(
-                    id: response.insightId,
-                    parentID: parentID,
-                    childLocalId: profile.profileID,
-                    summary: response.summary,
-                    strengths: response.strengths,
-                    needsPractice: response.needsPractice,
-                    recommendations: response.recommendations,
-                    suggestedDifficulty: response.suggestedDifficulty,
-                    tokensUsed: response.usage?.tokensUsed ?? 0,
-                    remainingTokens: response.usage?.remainingTokens ?? 0,
-                    generatedAt: generatedAt
-                ))
-            }
-            try modelContext.save()
-        } catch {
-            saveErrorMessage = error.localizedDescription
+    private func syncChildProfiles(_ remoteChildren: [ChildProfileDTO]) {
+        for child in remoteChildren {
+            upsertChildProfile(from: child)
         }
+        removeDuplicateChildProfilesKeepingBackendIDs()
+    }
+
+    private func upsertChildProfile(from child: ChildProfileDTO) {
+        let modelID = child.modelID
+        if let existingProfile = currentParentProfiles.first(where: { $0.backendID == child.id || $0.profileID == modelID }) {
+            existingProfile.parentID = parentID
+            existingProfile.backendID = child.id
+            existingProfile.name = child.name
+            existingProfile.age = child.age
+            existingProfile.grade = child.grade
+            existingProfile.avatar = child.avatar.rawValue
+        } else {
+            profiles.append(ChildProfile(
+                profileID: modelID,
+                backendID: child.id,
+                parentID: parentID,
+                name: child.name,
+                age: child.age,
+                grade: child.grade,
+                avatar: child.avatar
+            ))
+        }
+    }
+
+    private func updateLocalChildReferences(profileID: UUID, name: String) {
+        for exam in currentParentExams where exam.childProfileID == profileID {
+            exam.childName = name
+        }
+        for result in currentParentResults where result.childProfileID == profileID {
+            result.childName = name
+        }
+    }
+
+    private func updateLocalChildReferences(profileID: UUID, backendID: String, name: String) {
+        for exam in currentParentExams where exam.childProfileID == profileID {
+            exam.childBackendID = backendID
+            exam.childName = name
+        }
+        for result in currentParentResults where result.childProfileID == profileID {
+            result.childBackendID = backendID
+            result.childName = name
+        }
+        if latestResult?.childProfileID == profileID {
+            latestResult?.childBackendID = backendID
+            latestResult?.childName = name
+        }
+    }
+
+    private func replaceLocalChildID(_ oldID: UUID, with newID: UUID, backendID: String, name: String) {
+        for profile in profiles where profile.profileID == oldID {
+            profile.profileID = newID
+            profile.backendID = backendID
+            profile.parentID = parentID
+            profile.name = name
+        }
+        for exam in exams where exam.childProfileID == oldID {
+            exam.childProfileID = newID
+            exam.childBackendID = backendID
+            exam.childName = name
+        }
+        for result in results where result.childProfileID == oldID {
+            result.childProfileID = newID
+            result.childBackendID = backendID
+            result.childName = name
+        }
+        if latestResult?.childProfileID == oldID {
+            latestResult?.childProfileID = newID
+            latestResult?.childBackendID = backendID
+            latestResult?.childName = name
+        }
+    }
+
+    private func backendSyncedProfile(for profile: ChildProfile) async throws -> ChildProfile {
+        let remoteChildren = try await apiClient.listChildren()
+        if let remoteChild = remoteChildren.first(where: { $0.id == profile.backendID || $0.modelID == profile.profileID }) {
+            upsertChildProfile(from: remoteChild)
+            updateLocalChildReferences(profileID: profile.profileID, backendID: remoteChild.id, name: remoteChild.name)
+            return currentParentProfiles.first { $0.backendID == remoteChild.id } ?? profile
+        }
+
+        let createdChild = try await apiClient.createChild(
+            name: profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Little Scholar" : profile.name,
+            age: min(10, max(2, profile.age)),
+            grade: backendGrade(for: profile.grade),
+            avatar: KidAvatar.avatar(for: profile.avatar)
+        )
+        let oldID = profile.profileID
+        let newID = createdChild.modelID
+        replaceLocalChildID(oldID, with: newID, backendID: createdChild.id, name: createdChild.name)
+        upsertChildProfile(from: createdChild)
+        return currentParentProfiles.first { $0.backendID == createdChild.id || $0.profileID == newID } ?? profile
+    }
+
+    private func deleteProfileLocally(_ profile: ChildProfile) {
+        let profileID = profile.profileID
+        exams.removeAll { $0.parentID == parentID && $0.childProfileID == profileID }
+        results.removeAll { $0.parentID == parentID && $0.childProfileID == profileID }
+        if latestResult?.childProfileID == profileID {
+            latestResult = nil
+        }
+        profiles.removeAll { $0.parentID == parentID && $0.profileID == profileID }
+    }
+
+    private func removeDuplicateChildProfilesKeepingBackendIDs() {
+        var seenBackendIDs = Set<String>()
+        var seenLocalIDs = Set<UUID>()
+        profiles.removeAll { profile in
+            guard profile.parentID == parentID else { return false }
+            let backendID = profile.backendID.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !backendID.isEmpty {
+                if seenBackendIDs.contains(backendID) { return true }
+                seenBackendIDs.insert(backendID)
+                return false
+            }
+            if seenLocalIDs.contains(profile.profileID) {
+                return true
+            }
+            seenLocalIDs.insert(profile.profileID)
+            return false
+        }
+    }
+
+    private func backendChildID(for profile: ChildProfile) -> String {
+        profile.backendID.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func handleUnauthorizedSession() {
@@ -955,25 +1304,28 @@ struct ContentView: View {
 
         Task {
             do {
+                let syncedProfile = try await backendSyncedProfile(for: profile)
+                let childID = backendChildID(for: syncedProfile)
+                guard !childID.isEmpty else {
+                    throw APIError.server("This child profile is missing its backend ID. Refresh kids and try again.")
+                }
                 let backendExam = try await apiClient.generateExam(
-                    grade: backendGrade(for: profile.grade),
+                    childId: childID,
+                    grade: backendGrade(for: syncedProfile.grade),
                     subject: subject,
                     difficulty: difficulty,
                     questionCount: numberOfQuestions
                 )
-                let exam = backendExam.makeExam(for: profile, parentID: parentID)
+                let exam = backendExam.makeExam(for: syncedProfile, parentID: parentID)
                 guard !exam.questions.isEmpty else {
                     throw APIError.server("The backend did not return any questions. Please try generating the exam again.")
                 }
-                do {
-                    modelContext.insert(exam)
-                    try modelContext.save()
-                } catch {
-                    modelContext.rollback()
-                    throw APIError.server(persistenceMessage(for: error, fallback: "Could not save the generated exam. Please try again."))
-                }
+                exams.insert(exam, at: 0)
                 isGeneratingExam = false
                 selectedMode = .kid
+            } catch APIError.unauthorized {
+                isGeneratingExam = false
+                handleUnauthorizedSession()
             } catch {
                 isGeneratingExam = false
                 saveErrorMessage = error.localizedDescription
@@ -983,35 +1335,90 @@ struct ContentView: View {
 
     private func backendGrade(for profileGrade: String) -> String {
         switch profileGrade {
+        case "Nursery": "Nursery"
+        case "LKG": "LKG"
         case "UKG": "UKG"
         case "Grade 1": "Grade 1"
         default: "LKG"
         }
     }
 
-    private func persistenceMessage(for error: Error, fallback: String) -> String {
-        let nsError = error as NSError
-        if let detailedErrors = nsError.userInfo[NSDetailedErrorsKey] as? [NSError], !detailedErrors.isEmpty {
-            return detailedErrors.map { $0.localizedDescription }.joined(separator: "\n")
-        }
-        if nsError.localizedDescription == "Validation failed" {
-            return fallback
-        }
-        return nsError.localizedDescription
-    }
-
-    private func evaluateExam(exam: Exam, answers: [UUID: String]) -> ExamResult? {
+    private func evaluateExam(exam: Exam, answers: [UUID: String], onSaved: @escaping (ExamResult) -> Void) {
         let result = answerEvaluation.evaluate(exam: exam, answers: answers)
         result.parentID = parentID
+        Task {
+            if await saveExamAttempt(result: result, exam: exam) {
+                onSaved(result)
+            }
+        }
+    }
+
+    private func saveExamAttempt(result: ExamResult, exam: Exam) async -> Bool {
         do {
+            guard !result.childBackendID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw APIError.server("This exam is missing its backend child ID. Refresh kids and generate the exam again.")
+            }
+            let request = createExamAttemptRequest(result: result, exam: exam)
+            _ = try await apiClient.createExamAttempt(request)
             exam.isCompleted = true
-            modelContext.insert(result)
-            try modelContext.save()
+            results.insert(result, at: 0)
             latestResult = result
-            return result
+            return true
+        } catch APIError.unauthorized {
+            handleUnauthorizedSession()
         } catch {
             saveErrorMessage = error.localizedDescription
-            return nil
+        }
+        return false
+    }
+
+    private func createExamAttemptRequest(result: ExamResult, exam: Exam) -> CreateExamAttemptRequestDTO {
+        let topicStats = topicStats(for: result.evaluations)
+        let strongTopics = topicStats.filter { $0.score >= 70 }.prefix(20).map(\.topic)
+        let weakTopics = topicStats.filter { $0.score < 70 }.prefix(20).map(\.topic)
+        let totalMarks = result.evaluations.reduce(0) { $0 + max(1, $1.question.marks) }
+        let earnedMarks = result.evaluations.reduce(0) { $0 + ($1.isCorrect ? max(1, $1.question.marks) : 0) }
+        let answerPayload = result.evaluations.map { evaluation in
+            AttemptAnswerDTO(
+                questionId: evaluation.question.backendID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? evaluation.question.id.uuidString : evaluation.question.backendID,
+                selectedAnswer: evaluation.selectedAnswer.trimmingCharacters(in: .whitespacesAndNewlines),
+                isCorrect: evaluation.isCorrect,
+                topic: evaluation.question.topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "General" : evaluation.question.topic
+            )
+        }
+
+        return CreateExamAttemptRequestDTO(
+            childId: result.childBackendID.trimmingCharacters(in: .whitespacesAndNewlines),
+            examId: exam.examID.uuidString,
+            grade: backendGrade(for: result.grade),
+            subject: result.subject,
+            difficulty: result.difficulty,
+            questionCount: result.totalQuestions,
+            correctAnswers: result.correctAnswers,
+            totalMarks: max(1, totalMarks),
+            earnedMarks: earnedMarks,
+            scorePercentage: Double(result.percentage),
+            timeSpentSeconds: nil,
+            answers: answerPayload,
+            strongTopics: Array(strongTopics),
+            weakTopics: Array(weakTopics),
+            attemptedAt: ISO8601DateFormatter().string(from: result.completedAt)
+        )
+    }
+
+    private func topicStats(for evaluations: [AnswerEvaluation]) -> [TopicPerformance] {
+        var totals: [String: (correct: Int, total: Int)] = [:]
+        for evaluation in evaluations {
+            let topic = evaluation.question.topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "General" : evaluation.question.topic
+            let current = totals[topic] ?? (correct: 0, total: 0)
+            totals[topic] = (correct: current.correct + (evaluation.isCorrect ? 1 : 0), total: current.total + 1)
+        }
+        return totals.map { topic, values in
+            TopicPerformance(topic: topic, score: values.total == 0 ? 0 : Int((Double(values.correct) / Double(values.total) * 100).rounded()))
+        }
+        .sorted { lhs, rhs in
+            if lhs.score == rhs.score { return lhs.topic < rhs.topic }
+            return lhs.score < rhs.score
         }
     }
 
@@ -1021,67 +1428,6 @@ struct ContentView: View {
         }
     }
 
-    private func migrateLegacyRecordsToCurrentParentIfNeeded() {
-        guard parentIsLoggedIn, !parentID.isEmpty else { return }
-
-        var didMigrate = false
-        for profile in profiles where profile.parentID.isEmpty {
-            profile.parentID = parentID
-            didMigrate = true
-        }
-        for exam in exams where exam.parentID.isEmpty {
-            exam.parentID = parentID
-            didMigrate = true
-        }
-        for result in results where result.parentID.isEmpty {
-            result.parentID = parentID
-            didMigrate = true
-        }
-
-        if didMigrate {
-            do {
-                try modelContext.save()
-            } catch {
-                saveErrorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    private func removeInvalidPendingExams() {
-        let invalidExams = currentParentExams.filter { !$0.isCompleted && $0.questions.isEmpty }
-        guard !invalidExams.isEmpty else { return }
-
-        for exam in invalidExams {
-            modelContext.delete(exam)
-        }
-
-        do {
-            try modelContext.save()
-        } catch {
-            saveErrorMessage = error.localizedDescription
-        }
-    }
-
-    private func repairDuplicateProfileIDs() {
-        var seenIDs = Set<UUID>()
-        var didRepair = false
-
-        for profile in currentParentProfiles {
-            if seenIDs.contains(profile.profileID) {
-                profile.profileID = UUID()
-                didRepair = true
-            }
-            seenIDs.insert(profile.profileID)
-        }
-
-        if didRepair {
-            do {
-                try modelContext.save()
-            } catch {
-                saveErrorMessage = error.localizedDescription
-            }
-        }
-    }
 }
 
 struct ParentRegistrationView: View {
@@ -1182,6 +1528,7 @@ struct ParentRegistrationView: View {
 struct ParentLoginView: View {
     let registeredEmail: String
     let parentName: String
+    let errorMessage: String?
     let onLogin: (String, String) async -> Bool
     let onRegisterAgain: () -> Void
 
@@ -1212,7 +1559,7 @@ struct ParentLoginView: View {
                             .textContentType(.password)
 
                         if showLoginError {
-                            Label("Login failed. Check your email and password.", systemImage: "exclamationmark.triangle.fill")
+                            Label(errorMessage ?? "Login failed. Check your email and password.", systemImage: "exclamationmark.triangle.fill")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.red)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1221,6 +1568,7 @@ struct ParentLoginView: View {
                         Button {
                             Task {
                                 isSubmitting = true
+                                showLoginError = false
                                 showLoginError = !(await onLogin(email, password))
                                 isSubmitting = false
                             }
@@ -1275,7 +1623,7 @@ struct ChildProfileView: View {
     @State private var grade = "Grade 1"
     @State private var avatar: KidAvatar = .unicorn
 
-    private let grades = ["Nursery", "LKG", "UKG", "Kindergarten", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5"]
+    private let grades = ["Nursery", "LKG", "UKG", "Grade 1"]
     private var usesWideLayout: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
@@ -1299,7 +1647,7 @@ struct ChildProfileView: View {
         sectionCard(title: "Create Kid Profile", icon: "person.crop.circle.badge.plus") {
             VStack(spacing: 14) {
                 TextField("Kid name", text: $childName).textFieldStyle(.roundedBorder).font(.title3)
-                Stepper("Age: \(age)", value: $age, in: 3...12).font(.title3.bold())
+                Stepper("Age: \(age)", value: $age, in: 2...10).font(.title3.bold())
                 Picker("Grade", selection: $grade) { ForEach(grades, id: \.self) { Text($0).tag($0) } }.pickerStyle(.menu)
                 AvatarPicker(selection: $avatar)
                 Button {
@@ -1338,18 +1686,22 @@ struct ExamSetupView: View {
     @State private var numberOfQuestions = 5
 
     private var usesWideLayout: Bool { horizontalSizeClass == .regular }
+    private var previewExams: [Exam] {
+        guard let selectedProfile else { return [] }
+        return exams.filter { !$0.isCompleted && $0.childProfileID == selectedProfile.profileID }
+    }
 
     var body: some View {
         Group {
             if usesWideLayout {
                 HStack(alignment: .top, spacing: 18) {
                     setupForm.frame(maxWidth: 460)
-                    ExamPreviewView(exams: exams.filter { !$0.isCompleted })
+                    ExamPreviewView(exams: previewExams)
                 }
             } else {
                 VStack(spacing: 16) {
                     setupForm
-                    ExamPreviewView(exams: exams.filter { !$0.isCompleted })
+                    ExamPreviewView(exams: previewExams)
                 }
             }
         }
@@ -1463,13 +1815,13 @@ struct KidExamListView: View {
     let profiles: [ChildProfile]
     let exams: [Exam]
     let latestResult: ExamResult?
-    let onSubmit: (Exam, [UUID: String]) -> ExamResult?
+    let onSubmit: (Exam, [UUID: String], @escaping (ExamResult) -> Void) -> Void
     let onCreateExam: () -> Void
     let onDeleteProfile: (ChildProfile) -> Void
     let onUpdateProfile: (ChildProfile, String, Int, String, KidAvatar) -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var selectedProfileID: PersistentIdentifier?
+    @State private var selectedProfileID: UUID?
     @State private var selectedExam: Exam?
     @State private var completedResult: ExamResult?
     @State private var profilePendingDeletion: ChildProfile?
@@ -1485,7 +1837,7 @@ struct KidExamListView: View {
                 ResultView(result: completedResult, usesKidTheme: true)
             } else if let selectedExam {
                 ExamAttemptView(exam: selectedExam) { exam, answers in
-                    if let result = onSubmit(exam, answers) {
+                    onSubmit(exam, answers) { result in
                         self.completedResult = result
                         self.selectedExam = nil
                     }
@@ -1541,7 +1893,7 @@ struct KidExamListView: View {
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
                     ForEach(profiles) { profile in
-                        let isSelected = selectedProfileID == profile.persistentModelID
+                        let isSelected = selectedProfileID == profile.profileID
                         VStack(spacing: 8) {
                             HStack(spacing: 8) {
                                 Spacer()
@@ -1575,7 +1927,7 @@ struct KidExamListView: View {
                             }
 
                             Button {
-                                selectedProfileID = profile.persistentModelID
+                                selectedProfileID = profile.profileID
                                 selectedExam = nil
                                 completedResult = nil
                             } label: {
@@ -1614,18 +1966,18 @@ struct KidExamListView: View {
 
     private var selectedProfile: ChildProfile? {
         guard let selectedProfileID else { return nil }
-        return profiles.first { $0.persistentModelID == selectedProfileID }
+        return profiles.first { $0.profileID == selectedProfileID }
     }
     private var examsForSelectedProfile: [Exam] { selectedProfile.map { profile in exams.filter { $0.childProfileID == profile.profileID } } ?? [] }
     private func ensureSelectedProfile() {
-        if let selectedProfileID, !profiles.contains(where: { $0.persistentModelID == selectedProfileID }) {
+        if let selectedProfileID, !profiles.contains(where: { $0.profileID == selectedProfileID }) {
             self.selectedProfileID = nil
         }
     }
 
     private func confirmProfileDeletion() {
         guard let profile = profilePendingDeletion else { return }
-        if selectedProfileID == profile.persistentModelID {
+        if selectedProfileID == profile.profileID {
             selectedProfileID = nil
             selectedExam = nil
             completedResult = nil
@@ -1645,7 +1997,7 @@ struct EditKidProfileView: View {
     @State private var grade: String
     @State private var avatar: KidAvatar
 
-    private let grades = ["Nursery", "LKG", "UKG", "Kindergarten", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5"]
+    private let grades = ["Nursery", "LKG", "UKG", "Grade 1"]
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -1655,9 +2007,18 @@ struct EditKidProfileView: View {
         self.profile = profile
         self.onSave = onSave
         _name = State(initialValue: profile.name)
-        _age = State(initialValue: profile.age)
-        _grade = State(initialValue: profile.grade)
+        _age = State(initialValue: min(10, max(2, profile.age)))
+        _grade = State(initialValue: Self.backendGrade(for: profile.grade))
         _avatar = State(initialValue: KidAvatar.avatar(for: profile.avatar))
+    }
+
+    private static func backendGrade(for grade: String) -> String {
+        switch grade {
+        case "Nursery": "Nursery"
+        case "UKG": "UKG"
+        case "Grade 1": "Grade 1"
+        default: "LKG"
+        }
     }
 
     var body: some View {
@@ -1669,7 +2030,7 @@ struct EditKidProfileView: View {
                             TextField("Kid name", text: $name)
                                 .textFieldStyle(.roundedBorder)
                                 .font(.title3)
-                            Stepper("Age: \(age)", value: $age, in: 3...12)
+                            Stepper("Age: \(age)", value: $age, in: 2...10)
                                 .font(.title3.bold())
                             Picker("Grade", selection: $grade) {
                                 ForEach(grades, id: \.self) { Text($0).tag($0) }
@@ -1973,18 +2334,9 @@ struct AIInsightsView: View {
 
     private var insightRequest: AIInsightRequestDTO? {
         guard let selectedProfile else { return nil }
-        return AIInsightRequestDTO(
-            child: ChildSummaryDTO(age: selectedProfile.age, grade: selectedProfile.grade),
-            period: "all_time",
-            summary: LearningSummaryDTO(
-                totalExams: selectedResults.count,
-                averageScore: averageScore,
-                bestScore: bestScore,
-                subjects: subjectPerformance,
-                topicPerformance: topicCounts,
-                recentTrend: Array(recentTrend)
-            )
-        )
+        let childID = selectedProfile.backendID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !childID.isEmpty else { return nil }
+        return AIInsightRequestDTO(childId: childID, period: "all_time")
     }
 
     var body: some View {
@@ -2004,7 +2356,7 @@ struct AIInsightsView: View {
 
                             insightSummary
 
-                            Label("Only summarized learning performance is sent to generate AI insights. Child exam history remains stored on this device.", systemImage: "lock.shield.fill")
+                            Label("Learning performance is stored on the backend and used to generate AI insights.", systemImage: "lock.shield.fill")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -2185,7 +2537,7 @@ struct AIInsightDisplayData {
         needsPractice = response.needsPractice
         recommendations = response.recommendations
         suggestedDifficulty = response.suggestedDifficulty
-        generatedAt = response.generatedAt
+        generatedAt = response.createdAt
         tokensUsed = response.usage?.tokensUsed ?? 0
         remainingTokens = response.usage?.remainingTokens ?? 0
     }
@@ -2551,5 +2903,4 @@ private extension View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [ChildProfile.self, Exam.self, ExamResult.self, AIInsight.self], inMemory: true)
 }

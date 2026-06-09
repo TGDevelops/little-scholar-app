@@ -94,7 +94,7 @@ struct KidExamListView: View {
     let onSubmit: (Exam, [UUID: String]) -> Void
     let onCreateExam: () -> Void
 
-    @State private var selectedProfileID: PersistentIdentifier?
+    @State private var selectedProfileID: UUID?
     @State private var selectedExam: Exam?
     @State private var completedResult: ExamResult?
 
@@ -137,13 +137,13 @@ struct KidExamListView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
                     ForEach(profiles) { profile in
                         Button {
-                            selectedProfileID = profile.persistentModelID
+                            selectedProfileID = profile.profileID
                             selectedExam = nil
                         } label: {
                             VStack(spacing: 8) {
                                 Image(systemName: KidAvatar.avatar(for: profile.avatar).icon)
                                     .font(.system(size: 34))
-                                    .foregroundStyle(selectedProfileID == profile.persistentModelID ? .green : .orange)
+                                    .foregroundStyle(selectedProfileID == profile.profileID ? .green : .orange)
                                 Text(profile.name)
                                     .font(.title3.bold())
                                     .foregroundStyle(.primary)
@@ -154,7 +154,7 @@ struct KidExamListView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(selectedProfileID == profile.persistentModelID ? Color.green.opacity(0.2) : Color.white.opacity(0.85))
+                            .background(selectedProfileID == profile.profileID ? Color.green.opacity(0.2) : Color.white.opacity(0.85))
                             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                         }
                         .buttonStyle(.plain)
@@ -196,7 +196,7 @@ struct KidExamListView: View {
 
     private var selectedProfile: ChildProfile? {
         guard let selectedProfileID else { return nil }
-        return profiles.first { $0.persistentModelID == selectedProfileID }
+        return profiles.first { $0.profileID == selectedProfileID }
     }
 
     private var examsForSelectedProfile: [Exam] {
@@ -205,7 +205,7 @@ struct KidExamListView: View {
     }
 
     private func ensureSelectedProfile() {
-        if let selectedProfileID, !profiles.contains(where: { $0.persistentModelID == selectedProfileID }) {
+        if let selectedProfileID, !profiles.contains(where: { $0.profileID == selectedProfileID }) {
             self.selectedProfileID = nil
         }
     }
