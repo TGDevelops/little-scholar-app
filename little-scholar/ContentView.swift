@@ -34,6 +34,7 @@ final class ChildProfile: Identifiable {
 final class Exam: Identifiable {
     var id: UUID { examID }
     var examID: UUID = UUID()
+    var backendID: String = ""
     var parentID: String = ""
     var childProfileID: UUID = UUID()
     var childBackendID: String = ""
@@ -45,7 +46,8 @@ final class Exam: Identifiable {
     var isCompleted: Bool = false
     var questions: [Question] = []
 
-    init(parentID: String = "", childProfileID: UUID, childBackendID: String = "", childName: String, grade: String, subject: Subject, difficulty: Difficulty, questions: [Question]) {
+    init(backendID: String = "", parentID: String = "", childProfileID: UUID, childBackendID: String = "", childName: String, grade: String, subject: Subject, difficulty: Difficulty, questions: [Question]) {
+        self.backendID = backendID
         self.parentID = parentID
         self.childProfileID = childProfileID
         self.childBackendID = childBackendID
@@ -407,12 +409,20 @@ struct APIClient {
         try await post(path: "/api/auth/login", body: LoginRequestDTO(email: email, password: password), authorized: false)
     }
 
-    func generateExam(childId: String, grade: String, subject: Subject, difficulty: Difficulty, questionCount: Int) async throws -> BackendExamPaperDTO {
+    func generateExam(childId: String, subject: Subject, difficulty: Difficulty, questionCount: Int) async throws -> BackendExamPaperDTO {
         try await post(
-            path: "/api/exams/generate",
-            body: GenerateExamRequestDTO(childId: childId, grade: grade, subject: subject.rawValue, difficulty: difficulty.rawValue, questionCount: questionCount),
+            path: "/api/children/\(childId)/exams/generate",
+            body: GenerateExamRequestDTO(subject: subject.rawValue, difficulty: difficulty.rawValue, questionCount: questionCount),
             authorized: true
         )
+    }
+
+    func listPendingExams(childId: String) async throws -> [BackendExamPaperDTO] {
+        try await get(path: "/api/children/\(childId)/exams?status=pending", authorized: true)
+    }
+
+    func listExamAttempts(childId: String) async throws -> [ExamAttemptDTO] {
+        try await get(path: "/api/exam-attempts/children/\(childId)", authorized: true)
     }
 
     func generateAnalyticsInsight(request: AIInsightRequestDTO) async throws -> AIInsightResponseDTO {
@@ -443,12 +453,12 @@ struct APIClient {
         try await delete(path: "/api/children/\(id)", authorized: true)
     }
 
-    func createExamAttempt(_ request: CreateExamAttemptRequestDTO) async throws -> ExamAttemptDTO {
-        try await post(path: "/api/exam-attempts", body: request, authorized: true)
+    func createExamAttempt(examId: String, request: CreateExamAttemptRequestDTO) async throws {
+        try await postWithoutResponse(path: "/api/exams/\(examId)/attempt", body: request, authorized: true)
     }
 
     private func get<Response: Decodable>(path: String, authorized: Bool) async throws -> Response {
-        let endpoint = try baseURL.appending(path: path)
+        let endpoint = try endpoint(path: path)
         var request = URLRequest(url: endpoint)
         request.httpMethod = "GET"
         if authorized, let accessToken, !accessToken.isEmpty {
@@ -458,7 +468,7 @@ struct APIClient {
     }
 
     private func put<Request: Encodable, Response: Decodable>(path: String, body: Request, authorized: Bool) async throws -> Response {
-        let endpoint = try baseURL.appending(path: path)
+        let endpoint = try endpoint(path: path)
         var request = URLRequest(url: endpoint)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -470,7 +480,7 @@ struct APIClient {
     }
 
     private func delete<Response: Decodable>(path: String, authorized: Bool) async throws -> Response {
-        let endpoint = try baseURL.appending(path: path)
+        let endpoint = try endpoint(path: path)
         var request = URLRequest(url: endpoint)
         request.httpMethod = "DELETE"
         if authorized, let accessToken, !accessToken.isEmpty {
@@ -480,7 +490,7 @@ struct APIClient {
     }
 
     private func post<Request: Encodable, Response: Decodable>(path: String, body: Request, authorized: Bool) async throws -> Response {
-        let endpoint = try baseURL.appending(path: path)
+        let endpoint = try endpoint(path: path)
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -490,6 +500,26 @@ struct APIClient {
         request.httpBody = try JSONEncoder().encode(body)
 
         return try await send(request)
+    }
+
+    private func postWithoutResponse<Request: Encodable>(path: String, body: Request, authorized: Bool) async throws {
+        let endpoint = try endpoint(path: path)
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if authorized, let accessToken, !accessToken.isEmpty {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = try JSONEncoder().encode(body)
+
+        try await sendWithoutResponse(request)
+    }
+
+    private func endpoint(path: String) throws -> URL {
+        guard let endpoint = URL(string: path, relativeTo: try baseURL)?.absoluteURL else {
+            throw APIError.invalidBaseURL
+        }
+        return endpoint
     }
 
     private func send<Response: Decodable>(_ request: URLRequest) async throws -> Response {
@@ -508,7 +538,24 @@ struct APIClient {
             let success = try JSONDecoder().decode(APISuccessResponse<Response>.self, from: data)
             return success.data
         } catch {
-            throw APIError.decoding("Could not read the backend login response. Please try again.")
+            if let directResponse = try? JSONDecoder().decode(Response.self, from: data) {
+                return directResponse
+            }
+            throw APIError.decoding("Could not read the backend response. Please try again.")
+        }
+    }
+
+    private func sendWithoutResponse(_ request: URLRequest) async throws {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let errorResponse = try? JSONDecoder().decode(ErrorResponseDTO.self, from: data)
+            let message = errorResponse?.error.displayMessage ?? "Request failed with status \(httpResponse.statusCode)."
+            if httpResponse.statusCode == 401 { throw APIError.unauthorized }
+            if httpResponse.statusCode == 429 || message.localizedCaseInsensitiveContains("token") || message.localizedCaseInsensitiveContains("limit") {
+                throw APIError.tokenLimitExceeded
+            }
+            throw APIError.server(message)
         }
     }
 }
@@ -612,8 +659,6 @@ struct LoginRequestDTO: Encodable {
 }
 
 struct GenerateExamRequestDTO: Encodable {
-    let childId: String
-    let grade: String
     let subject: String
     let difficulty: String
     let questionCount: Int
@@ -691,28 +736,15 @@ struct DeleteResponseDTO: Decodable {
 }
 
 struct CreateExamAttemptRequestDTO: Encodable {
-    let childId: String
-    let examId: String?
-    let grade: String
-    let subject: String
-    let difficulty: String
-    let questionCount: Int
     let correctAnswers: Int
     let totalMarks: Int
     let earnedMarks: Int
     let scorePercentage: Double
     let timeSpentSeconds: Int?
-    let answers: [AttemptAnswerDTO]?
+    let answers: [String: String]
     let strongTopics: [String]
     let weakTopics: [String]
     let attemptedAt: String
-}
-
-struct AttemptAnswerDTO: Encodable {
-    let questionId: String
-    let selectedAnswer: String
-    let isCorrect: Bool
-    let topic: String
 }
 
 struct ExamAttemptDTO: Decodable {
@@ -734,6 +766,45 @@ struct ExamAttemptDTO: Decodable {
     let attemptedAt: String?
     let createdAt: String?
     let updatedAt: String?
+}
+
+private extension ExamAttemptDTO {
+    func makeExamResult(for profile: ChildProfile, parentID: String) -> ExamResult {
+        let correct = max(0, correctAnswers ?? 0)
+        let total = resolvedTotalQuestions(correctAnswers: correct)
+        let result = ExamResult(
+            parentID: parentID,
+            childProfileID: profile.profileID,
+            childBackendID: childId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? childId ?? profile.backendID : profile.backendID,
+            childName: profile.name,
+            grade: grade?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? grade ?? profile.grade : profile.grade,
+            subject: subject?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? subject ?? Subject.maths.rawValue : Subject.maths.rawValue,
+            difficulty: difficulty?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? difficulty ?? Difficulty.easy.rawValue : Difficulty.easy.rawValue,
+            totalQuestions: total,
+            correctAnswers: min(correct, total),
+            evaluations: []
+        )
+        result.completedAt = parsedDate(from: attemptedAt) ?? parsedDate(from: createdAt) ?? parsedDate(from: updatedAt) ?? .now
+        return result
+    }
+
+    private func resolvedTotalQuestions(correctAnswers: Int) -> Int {
+        if let questionCount, questionCount > 0 { return questionCount }
+        if let totalMarks, totalMarks > 0 { return totalMarks }
+        if let scorePercentage, scorePercentage > 0, correctAnswers > 0 {
+            return max(correctAnswers, Int((Double(correctAnswers) / (scorePercentage / 100)).rounded()))
+        }
+        if let earnedMarks, earnedMarks > 0 { return max(earnedMarks, correctAnswers) }
+        return max(1, correctAnswers)
+    }
+
+    private func parsedDate(from value: String?) -> Date? {
+        guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractionalFormatter.date(from: value) { return date }
+        return ISO8601DateFormatter().date(from: value)
+    }
 }
 
 struct AIInsightResponseDTO: Decodable {
@@ -816,14 +887,41 @@ struct BackendExamPaperDTO: Decodable {
     let questions: [BackendQuestionDTO]
     let usage: AIInsightUsageDTO?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case examId
+        case childId
+        case grade
+        case subject
+        case difficulty
+        case questionCount
+        case questions
+        case usage
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        examId = try container.decodeIfPresent(String.self, forKey: .examId)
+            ?? container.decodeIfPresent(String.self, forKey: .id)
+            ?? ""
+        childId = try container.decodeIfPresent(String.self, forKey: .childId)
+        grade = try container.decodeIfPresent(String.self, forKey: .grade) ?? "LKG"
+        subject = try container.decodeIfPresent(String.self, forKey: .subject) ?? Subject.maths.rawValue
+        difficulty = try container.decodeIfPresent(String.self, forKey: .difficulty) ?? Difficulty.easy.rawValue
+        questions = try container.decodeIfPresent([BackendQuestionDTO].self, forKey: .questions) ?? []
+        questionCount = try container.decodeIfPresent(Int.self, forKey: .questionCount) ?? questions.count
+        usage = try container.decodeIfPresent(AIInsightUsageDTO.self, forKey: .usage)
+    }
+
     func makeExam(for profile: ChildProfile, parentID: String) -> Exam {
         let subjectValue = Subject(rawValue: subject) ?? .maths
         let difficultyValue = Difficulty(rawValue: difficulty) ?? .easy
         let sanitizedQuestions = questions.map(\.modelQuestion).map(\.sanitizedForPersistence)
         let exam = Exam(
+            backendID: examId,
             parentID: parentID,
             childProfileID: profile.profileID,
-            childBackendID: profile.backendID,
+            childBackendID: childId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? childId ?? profile.backendID : profile.backendID,
             childName: profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Little Scholar" : profile.name,
             grade: profile.grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? grade : profile.grade,
             subject: subjectValue,
@@ -951,7 +1049,7 @@ struct ContentView: View {
             }
             .navigationTitle("Little Scholar")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Could not save", isPresented: saveErrorBinding) {
+            .alert("Request failed", isPresented: saveErrorBinding) {
                 Button("OK", role: .cancel) { saveErrorMessage = nil }
             } message: {
                 Text(saveErrorMessage ?? "Please try again.")
@@ -980,7 +1078,16 @@ struct ContentView: View {
         case .parent:
             ScrollView { ChildProfileView(profiles: currentParentProfiles, onSaveProfile: saveProfile).padding() }
         case .exam:
-            ScrollView { ExamSetupView(profiles: currentParentProfiles, exams: displayableExams, isGenerating: isGeneratingExam, onGenerateExam: generateExam).padding() }
+            ScrollView {
+                ExamSetupView(
+                    profiles: currentParentProfiles,
+                    exams: displayableExams,
+                    isGenerating: isGeneratingExam,
+                    onGenerateExam: generateExam,
+                    onLoadPendingExams: loadPendingExams
+                )
+                .padding()
+            }
         case .kid:
             KidExamListView(
                 profiles: currentParentProfiles,
@@ -988,11 +1095,17 @@ struct ContentView: View {
                 latestResult: latestResult,
                 onSubmit: evaluateExam,
                 onCreateExam: { selectedMode = .exam },
+                onLoadPendingExams: loadPendingExams,
                 onDeleteProfile: deleteProfile,
                 onUpdateProfile: updateProfile
             )
         case .performance:
-            PerformanceDashboardView(profiles: currentParentProfiles, results: currentParentResults)
+            PerformanceDashboardView(
+                profiles: currentParentProfiles,
+                results: currentParentResults,
+                onLoadHistory: loadExamHistory,
+                onLoadAllHistory: loadAllExamHistory
+            )
         case .aiInsights:
             AIInsightsView(
                 profiles: currentParentProfiles,
@@ -1268,6 +1381,92 @@ struct ContentView: View {
         profiles.removeAll { $0.parentID == parentID && $0.profileID == profileID }
     }
 
+    private func loadPendingExams(for profile: ChildProfile) {
+        guard profile.parentID == parentID else { return }
+        let childID = backendChildID(for: profile)
+        guard !childID.isEmpty else { return }
+
+        Task {
+            do {
+                let backendExams = try await apiClient.listPendingExams(childId: childID)
+                replacePendingExams(for: profile, with: backendExams)
+            } catch APIError.unauthorized {
+                handleUnauthorizedSession()
+            } catch {
+                saveErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func loadAllExamHistory() {
+        let profilesToRefresh = currentParentProfiles
+        guard !profilesToRefresh.isEmpty else { return }
+
+        Task {
+            for profile in profilesToRefresh {
+                await refreshExamHistory(for: profile)
+            }
+        }
+    }
+
+    private func loadExamHistory(for profile: ChildProfile) {
+        guard profile.parentID == parentID else { return }
+        Task { await refreshExamHistory(for: profile) }
+    }
+
+    private func refreshExamHistory(for profile: ChildProfile) async {
+        let childID = backendChildID(for: profile)
+        guard !childID.isEmpty else { return }
+
+        do {
+            let attempts = try await apiClient.listExamAttempts(childId: childID)
+            replaceExamHistory(for: profile, with: attempts)
+        } catch APIError.unauthorized {
+            handleUnauthorizedSession()
+        } catch {
+            saveErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func replaceExamHistory(for profile: ChildProfile, with attempts: [ExamAttemptDTO]) {
+        let childID = backendChildID(for: profile)
+        results.removeAll {
+            $0.parentID == parentID
+                && ($0.childBackendID == childID || $0.childProfileID == profile.profileID)
+        }
+
+        let remoteResults = attempts
+            .map { $0.makeExamResult(for: profile, parentID: parentID) }
+            .sorted { $0.completedAt > $1.completedAt }
+
+        results.insert(contentsOf: remoteResults, at: 0)
+        if latestResult?.childProfileID == profile.profileID {
+            latestResult = remoteResults.first
+        }
+    }
+
+    private func replacePendingExams(for profile: ChildProfile, with backendExams: [BackendExamPaperDTO]) {
+        let childID = backendChildID(for: profile)
+        exams.removeAll {
+            $0.parentID == parentID
+                && !$0.isCompleted
+                && ($0.childBackendID == childID || $0.childProfileID == profile.profileID)
+        }
+        for backendExam in backendExams.reversed() {
+            upsertPendingExam(backendExam.makeExam(for: profile, parentID: parentID))
+        }
+    }
+
+    private func upsertPendingExam(_ exam: Exam) {
+        if let existingIndex = exams.firstIndex(where: {
+            !$0.backendID.isEmpty && $0.backendID == exam.backendID
+        }) {
+            exams[existingIndex] = exam
+        } else {
+            exams.insert(exam, at: 0)
+        }
+    }
+
     private func removeDuplicateChildProfilesKeepingBackendIDs() {
         var seenBackendIDs = Set<String>()
         var seenLocalIDs = Set<UUID>()
@@ -1311,7 +1510,6 @@ struct ContentView: View {
                 }
                 let backendExam = try await apiClient.generateExam(
                     childId: childID,
-                    grade: backendGrade(for: syncedProfile.grade),
                     subject: subject,
                     difficulty: difficulty,
                     questionCount: numberOfQuestions
@@ -1320,7 +1518,7 @@ struct ContentView: View {
                 guard !exam.questions.isEmpty else {
                     throw APIError.server("The backend did not return any questions. Please try generating the exam again.")
                 }
-                exams.insert(exam, at: 0)
+                upsertPendingExam(exam)
                 isGeneratingExam = false
                 selectedMode = .kid
             } catch APIError.unauthorized {
@@ -1358,11 +1556,19 @@ struct ContentView: View {
             guard !result.childBackendID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw APIError.server("This exam is missing its backend child ID. Refresh kids and generate the exam again.")
             }
+            let backendExamID = exam.backendID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !backendExamID.isEmpty else {
+                throw APIError.server("This exam is missing its backend exam ID. Refresh pending exams and try again.")
+            }
             let request = createExamAttemptRequest(result: result, exam: exam)
-            _ = try await apiClient.createExamAttempt(request)
+            try await apiClient.createExamAttempt(examId: backendExamID, request: request)
             exam.isCompleted = true
+            exams.removeAll { $0.backendID == backendExamID }
             results.insert(result, at: 0)
             latestResult = result
+            if let profile = currentParentProfiles.first(where: { $0.profileID == result.childProfileID }) {
+                loadExamHistory(for: profile)
+            }
             return true
         } catch APIError.unauthorized {
             handleUnauthorizedSession()
@@ -1378,22 +1584,14 @@ struct ContentView: View {
         let weakTopics = topicStats.filter { $0.score < 70 }.prefix(20).map(\.topic)
         let totalMarks = result.evaluations.reduce(0) { $0 + max(1, $1.question.marks) }
         let earnedMarks = result.evaluations.reduce(0) { $0 + ($1.isCorrect ? max(1, $1.question.marks) : 0) }
-        let answerPayload = result.evaluations.map { evaluation in
-            AttemptAnswerDTO(
-                questionId: evaluation.question.backendID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? evaluation.question.id.uuidString : evaluation.question.backendID,
-                selectedAnswer: evaluation.selectedAnswer.trimmingCharacters(in: .whitespacesAndNewlines),
-                isCorrect: evaluation.isCorrect,
-                topic: evaluation.question.topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "General" : evaluation.question.topic
-            )
-        }
+        let answerPayload = Dictionary(uniqueKeysWithValues: result.evaluations.map { evaluation in
+            let questionID = evaluation.question.backendID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? evaluation.question.id.uuidString
+                : evaluation.question.backendID
+            return (questionID, evaluation.selectedAnswer.trimmingCharacters(in: .whitespacesAndNewlines))
+        })
 
         return CreateExamAttemptRequestDTO(
-            childId: result.childBackendID.trimmingCharacters(in: .whitespacesAndNewlines),
-            examId: exam.examID.uuidString,
-            grade: backendGrade(for: result.grade),
-            subject: result.subject,
-            difficulty: result.difficulty,
-            questionCount: result.totalQuestions,
             correctAnswers: result.correctAnswers,
             totalMarks: max(1, totalMarks),
             earnedMarks: earnedMarks,
@@ -1678,6 +1876,7 @@ struct ExamSetupView: View {
     let exams: [Exam]
     let isGenerating: Bool
     let onGenerateExam: (ChildProfile, Subject, Difficulty, Int) -> Void
+    let onLoadPendingExams: (ChildProfile) -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedProfileID: UUID?
@@ -1706,7 +1905,17 @@ struct ExamSetupView: View {
             }
         }
         .adaptiveContentWidth()
-        .onAppear(perform: ensureSelectedProfile)
+        .onAppear {
+            ensureSelectedProfile()
+            loadPendingExamsForSelectedProfile()
+        }
+        .onChange(of: selectedProfileID) { _, _ in
+            loadPendingExamsForSelectedProfile()
+        }
+        .onChange(of: profiles.map(\.profileID)) { _, _ in
+            ensureSelectedProfile()
+            loadPendingExamsForSelectedProfile()
+        }
     }
 
     private var setupForm: some View {
@@ -1746,6 +1955,11 @@ struct ExamSetupView: View {
 
     private func ensureSelectedProfile() {
         if selectedProfileID == nil || selectedProfile == nil { selectedProfileID = profiles.first?.profileID }
+    }
+
+    private func loadPendingExamsForSelectedProfile() {
+        guard let selectedProfile else { return }
+        onLoadPendingExams(selectedProfile)
     }
 }
 
@@ -1817,6 +2031,7 @@ struct KidExamListView: View {
     let latestResult: ExamResult?
     let onSubmit: (Exam, [UUID: String], @escaping (ExamResult) -> Void) -> Void
     let onCreateExam: () -> Void
+    let onLoadPendingExams: (ChildProfile) -> Void
     let onDeleteProfile: (ChildProfile) -> Void
     let onUpdateProfile: (ChildProfile, String, Int, String, KidAvatar) -> Void
 
@@ -1861,7 +2076,17 @@ struct KidExamListView: View {
                     .padding()
                     .adaptiveContentWidth()
                 }
-                .onAppear(perform: ensureSelectedProfile)
+                .onAppear {
+                    ensureSelectedProfile()
+                    loadPendingExamsForSelectedProfile()
+                }
+                .onChange(of: selectedProfileID) { _, _ in
+                    loadPendingExamsForSelectedProfile()
+                }
+                .onChange(of: profiles.map(\.profileID)) { _, _ in
+                    ensureSelectedProfile()
+                    loadPendingExamsForSelectedProfile()
+                }
             }
         }
         .confirmationDialog(
@@ -1973,6 +2198,14 @@ struct KidExamListView: View {
         if let selectedProfileID, !profiles.contains(where: { $0.profileID == selectedProfileID }) {
             self.selectedProfileID = nil
         }
+        if selectedProfileID == nil {
+            selectedProfileID = profiles.first?.profileID
+        }
+    }
+
+    private func loadPendingExamsForSelectedProfile() {
+        guard let selectedProfile else { return }
+        onLoadPendingExams(selectedProfile)
     }
 
     private func confirmProfileDeletion() {
@@ -2152,11 +2385,16 @@ struct ExamAttemptView: View {
 struct PerformanceDashboardView: View {
     let profiles: [ChildProfile]
     let results: [ExamResult]
+    let onLoadHistory: (ChildProfile) -> Void
+    let onLoadAllHistory: () -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedProfileID: UUID?
 
-    private var filteredResults: [ExamResult] { selectedProfileID.map { id in results.filter { $0.childProfileID == id } } ?? results }
+    private var filteredResults: [ExamResult] {
+        let selectedResults = selectedProfileID.map { id in results.filter { $0.childProfileID == id } } ?? results
+        return selectedResults.sorted { $0.completedAt > $1.completedAt }
+    }
     private var usesWideLayout: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
@@ -2177,6 +2415,18 @@ struct PerformanceDashboardView: View {
             .padding()
             .adaptiveContentWidth()
         }
+        .task {
+            loadSelectedHistory()
+        }
+        .onChange(of: selectedProfileID) { _, _ in
+            loadSelectedHistory()
+        }
+        .onChange(of: profiles.map(\.profileID)) { _, profileIDs in
+            if let selectedProfileID, !profileIDs.contains(selectedProfileID) {
+                self.selectedProfileID = nil
+            }
+            loadSelectedHistory()
+        }
     }
 
     private var dashboardCard: some View {
@@ -2193,6 +2443,14 @@ struct PerformanceDashboardView: View {
                     HistorySummary(results: filteredResults)
                 }
             }
+        }
+    }
+
+    private func loadSelectedHistory() {
+        if let selectedProfileID, let profile = profiles.first(where: { $0.profileID == selectedProfileID }) {
+            onLoadHistory(profile)
+        } else {
+            onLoadAllHistory()
         }
     }
 }
@@ -2899,8 +3157,4 @@ private extension View {
         frame(maxWidth: maxWidth)
             .frame(maxWidth: .infinity)
     }
-}
-
-#Preview {
-    ContentView()
 }

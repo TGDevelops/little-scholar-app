@@ -3,6 +3,7 @@ import Foundation
 final class Exam: Identifiable {
     var id: UUID { examID }
     var examID: UUID = UUID()
+    var backendID: String = ""
     var parentID: String = ""
     var childProfileID: UUID = UUID()
     var childBackendID: String = ""
@@ -16,6 +17,7 @@ final class Exam: Identifiable {
 
     init(
         examID: UUID = UUID(),
+        backendID: String = "",
         parentID: String = "",
         childProfileID: UUID,
         childBackendID: String = "",
@@ -28,6 +30,7 @@ final class Exam: Identifiable {
         isCompleted: Bool = false
     ) {
         self.examID = examID
+        self.backendID = backendID
         self.parentID = parentID
         self.childProfileID = childProfileID
         self.childBackendID = childBackendID
