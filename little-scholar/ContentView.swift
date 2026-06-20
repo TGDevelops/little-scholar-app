@@ -372,7 +372,7 @@ enum APIError: LocalizedError {
     case invalidBaseURL
     case invalidResponse
     case unauthorized
-    case tokenLimitExceeded
+    case usageLimitExceeded(String)
     case decoding(String)
     case server(String)
 
@@ -381,7 +381,7 @@ enum APIError: LocalizedError {
         case .invalidBaseURL: "Set a valid backend base URL."
         case .invalidResponse: "The backend returned an invalid response."
         case .unauthorized: "Your session has expired. Please login again."
-        case .tokenLimitExceeded: "AI insight limit reached. Please try again later or upgrade when subscriptions are available."
+        case .usageLimitExceeded(let message): message
         case .decoding(let message): message
         case .server(let message): message
         }
@@ -431,6 +431,10 @@ struct APIClient {
 
     func listChildren() async throws -> [ChildProfileDTO] {
         try await get(path: "/api/children", authorized: true)
+    }
+
+    func usageStatus() async throws -> UsageStatus {
+        try await get(path: "/api/usage/me", authorized: true)
     }
 
     func createChild(name: String, age: Int, grade: String, avatar: KidAvatar) async throws -> ChildProfileDTO {
@@ -530,7 +534,7 @@ struct APIClient {
             let message = errorResponse?.error.displayMessage ?? "Request failed with status \(httpResponse.statusCode)."
             if httpResponse.statusCode == 401 { throw APIError.unauthorized }
             if httpResponse.statusCode == 429 || message.localizedCaseInsensitiveContains("token") || message.localizedCaseInsensitiveContains("limit") {
-                throw APIError.tokenLimitExceeded
+                throw APIError.usageLimitExceeded(friendlyUsageLimitMessage(from: message))
             }
             throw APIError.server(message)
         }
@@ -553,11 +557,19 @@ struct APIClient {
             let message = errorResponse?.error.displayMessage ?? "Request failed with status \(httpResponse.statusCode)."
             if httpResponse.statusCode == 401 { throw APIError.unauthorized }
             if httpResponse.statusCode == 429 || message.localizedCaseInsensitiveContains("token") || message.localizedCaseInsensitiveContains("limit") {
-                throw APIError.tokenLimitExceeded
+                throw APIError.usageLimitExceeded(friendlyUsageLimitMessage(from: message))
             }
             throw APIError.server(message)
         }
     }
+}
+
+private func friendlyUsageLimitMessage(from message: String) -> String {
+    let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmedMessage.isEmpty || trimmedMessage.localizedCaseInsensitiveContains("token") {
+        return "Usage limit reached. Please try again later or upgrade to Premium."
+    }
+    return trimmedMessage
 }
 
 struct APISuccessResponse<DataPayload: Decodable>: Decodable {
@@ -701,6 +713,85 @@ struct RecentTrendDTO: Encodable {
     let subject: String
     let percentage: Int
     let attemptedAt: String
+}
+
+struct UsageStatus: Decodable {
+    let plan: String
+    let questionsUsedThisWeek: Int
+    let weeklyQuestionLimit: Int?
+    let questionsRemainingThisWeek: Int?
+    let insightsUsedThisWeek: Int
+    let weeklyInsightLimit: Int?
+    let childrenUsed: Int
+    let childrenLimit: Int
+    let isPremium: Bool
+    let weekStart: Date
+    let weekEnd: Date
+    let insightsUsedTodayForSelectedChild: Int?
+    let dailyInsightLimitPerChild: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case plan
+        case questionsUsedThisWeek
+        case weeklyQuestionLimit
+        case questionsRemainingThisWeek
+        case insightsUsedThisWeek
+        case weeklyInsightLimit
+        case childrenUsed
+        case childrenLimit
+        case weekStart
+        case weekEnd
+        case insightsUsedTodayForSelectedChild
+        case dailyInsightLimitPerChild
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        plan = try container.decodeIfPresent(String.self, forKey: .plan) ?? "FREE"
+        questionsUsedThisWeek = try container.decodeIfPresent(Int.self, forKey: .questionsUsedThisWeek) ?? 0
+        weeklyQuestionLimit = try container.decodeIfPresent(Int.self, forKey: .weeklyQuestionLimit)
+        questionsRemainingThisWeek = try container.decodeIfPresent(Int.self, forKey: .questionsRemainingThisWeek)
+        insightsUsedTodayForSelectedChild = try container.decodeIfPresent(Int.self, forKey: .insightsUsedTodayForSelectedChild)
+        dailyInsightLimitPerChild = try container.decodeIfPresent(Int.self, forKey: .dailyInsightLimitPerChild)
+        insightsUsedThisWeek = try container.decodeIfPresent(Int.self, forKey: .insightsUsedThisWeek)
+            ?? insightsUsedTodayForSelectedChild
+            ?? 0
+        weeklyInsightLimit = try container.decodeIfPresent(Int.self, forKey: .weeklyInsightLimit)
+        childrenUsed = try container.decodeIfPresent(Int.self, forKey: .childrenUsed) ?? 0
+        childrenLimit = try container.decodeIfPresent(Int.self, forKey: .childrenLimit) ?? (plan.uppercased() == "PREMIUM" ? 5 : 1)
+        isPremium = plan.uppercased() == "PREMIUM"
+        weekStart = Self.decodeDate(forKey: .weekStart, from: container) ?? Calendar.current.dateInterval(of: .weekOfYear, for: .now)?.start ?? .now
+        weekEnd = Self.decodeDate(forKey: .weekEnd, from: container) ?? Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? .now
+    }
+
+    private static func decodeDate(forKey key: CodingKeys, from container: KeyedDecodingContainer<CodingKeys>) -> Date? {
+        guard let value = try? container.decodeIfPresent(String.self, forKey: key) else { return nil }
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractionalFormatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    }
+
+    var displayPlan: String {
+        isPremium ? "Premium" : "Free"
+    }
+
+    func canGenerate(questionCount: Int) -> Bool {
+        guard !isPremium, let questionsRemainingThisWeek else { return true }
+        return questionsRemainingThisWeek >= questionCount
+    }
+
+    var canCreateChild: Bool {
+        childrenUsed < childrenLimit
+    }
+
+    var canGenerateInsight: Bool {
+        if isPremium {
+            guard let used = insightsUsedTodayForSelectedChild, let limit = dailyInsightLimitPerChild else { return true }
+            return used < limit
+        }
+        guard let limit = weeklyInsightLimit else { return true }
+        return insightsUsedThisWeek < limit
+    }
 }
 
 struct ChildProfileRequestDTO: Encodable {
@@ -1015,6 +1106,8 @@ struct ContentView: View {
     @State private var saveErrorMessage: String?
     @State private var isGeneratingExam = false
     @State private var showingLogin = false
+    @State private var usageStatus: UsageStatus?
+    @State private var showingPremiumPlaceholder = false
 
     private let answerEvaluation = AnswerEvaluationService()
 
@@ -1058,14 +1151,18 @@ struct ContentView: View {
                 migrateBackendURLIfNeeded()
                 if parentIsLoggedIn {
                     await refreshChildrenFromBackend()
+                    await refreshUsageStatus()
                 }
+            }
+            .sheet(isPresented: $showingPremiumPlaceholder) {
+                PremiumComingSoonView()
             }
         }
     }
 
     private var mainAppShell: some View {
         VStack(spacing: 14) {
-            HeaderView(parentName: parentName, onLogout: { parentIsLoggedIn = false })
+            HeaderView(parentName: parentName, onLogout: logoutParent)
             ModeNavigation(selectedMode: $selectedMode)
             content
         }
@@ -1076,7 +1173,15 @@ struct ContentView: View {
     private var content: some View {
         switch selectedMode {
         case .parent:
-            ScrollView { ChildProfileView(profiles: currentParentProfiles, onSaveProfile: saveProfile).padding() }
+            ScrollView {
+                ChildProfileView(
+                    profiles: currentParentProfiles,
+                    usageStatus: usageStatus,
+                    onSaveProfile: saveProfile,
+                    onUpgrade: { showingPremiumPlaceholder = true }
+                )
+                .padding()
+            }
         case .exam:
             ScrollView {
                 ExamSetupView(
@@ -1112,7 +1217,9 @@ struct ContentView: View {
                 results: currentParentResults,
                 cachedInsights: [],
                 apiClient: apiClient,
+                usageStatus: usageStatus,
                 onInsightGenerated: { _, _ in },
+                onRefreshUsage: { Task { await refreshUsageStatus() } },
                 onUnauthorized: handleUnauthorizedSession
             )
         }
@@ -1188,7 +1295,10 @@ struct ContentView: View {
         parentIsLoggedIn = true
 
         let authenticatedClient = APIClient(baseURLString: apiBaseURL, accessToken: accessToken)
-        Task { await refreshChildrenFromBackend(using: authenticatedClient) }
+        Task {
+            await refreshChildrenFromBackend(using: authenticatedClient)
+            await refreshUsageStatus(using: authenticatedClient)
+        }
         return true
     }
 
@@ -1198,10 +1308,18 @@ struct ContentView: View {
         parentEmail = ""
         parentCity = ""
         parentAccessToken = ""
+        usageStatus = nil
         latestResult = nil
         selectedMode = .parent
         parentIsRegistered = false
         parentIsLoggedIn = false
+    }
+
+    private func logoutParent() {
+        parentAccessToken = ""
+        usageStatus = nil
+        parentIsLoggedIn = false
+        selectedMode = .parent
     }
 
     private func saveProfile(name: String, age: Int, grade: String, avatar: KidAvatar) {
@@ -1210,8 +1328,16 @@ struct ContentView: View {
 
         Task {
             do {
+                let status = try await currentUsageStatus()
+                guard status.canCreateChild else {
+                    saveErrorMessage = status.isPremium
+                        ? "Premium plan supports up to 5 child profiles."
+                        : "Free plan supports 1 child profile. Upgrade to Premium to add up to 5 children."
+                    return
+                }
                 let child = try await apiClient.createChild(name: trimmedName, age: age, grade: backendGrade(for: grade), avatar: avatar)
                 upsertChildProfile(from: child)
+                await refreshUsageStatus()
             } catch APIError.unauthorized {
                 handleUnauthorizedSession()
             } catch {
@@ -1232,12 +1358,30 @@ struct ContentView: View {
             do {
                 _ = try await apiClient.deleteChild(id: backendID)
                 deleteProfileLocally(profile)
+                await refreshUsageStatus()
             } catch APIError.unauthorized {
                 handleUnauthorizedSession()
             } catch {
                 saveErrorMessage = error.localizedDescription
             }
         }
+    }
+
+    private func refreshUsageStatus(using client: APIClient? = nil) async {
+        do {
+            usageStatus = try await (client ?? apiClient).usageStatus()
+        } catch APIError.unauthorized {
+            handleUnauthorizedSession()
+        } catch {
+            // Usage should help the experience, not block the rest of the parent workflow.
+        }
+    }
+
+    private func currentUsageStatus() async throws -> UsageStatus {
+        if let usageStatus { return usageStatus }
+        let status = try await apiClient.usageStatus()
+        usageStatus = status
+        return status
     }
 
     private func updateProfile(_ profile: ChildProfile, name: String, age: Int, grade: String, avatar: KidAvatar) {
@@ -1356,6 +1500,14 @@ struct ContentView: View {
             upsertChildProfile(from: remoteChild)
             updateLocalChildReferences(profileID: profile.profileID, backendID: remoteChild.id, name: remoteChild.name)
             return currentParentProfiles.first { $0.backendID == remoteChild.id } ?? profile
+        }
+
+        let status = try await currentUsageStatus()
+        guard status.canCreateChild else {
+            throw APIError.usageLimitExceeded(status.isPremium
+                ? "Premium plan supports up to 5 child profiles."
+                : "Free plan supports 1 child profile. Upgrade to Premium to add up to 5 children."
+            )
         }
 
         let createdChild = try await apiClient.createChild(
@@ -1503,6 +1655,13 @@ struct ContentView: View {
 
         Task {
             do {
+                let status = try await currentUsageStatus()
+                guard status.canGenerate(questionCount: numberOfQuestions) else {
+                    let remaining = max(0, status.questionsRemainingThisWeek ?? 0)
+                    saveErrorMessage = "You have only \(remaining) questions remaining this week. Reduce the question count or upgrade to Premium."
+                    isGeneratingExam = false
+                    return
+                }
                 let syncedProfile = try await backendSyncedProfile(for: profile)
                 let childID = backendChildID(for: syncedProfile)
                 guard !childID.isEmpty else {
@@ -1520,10 +1679,15 @@ struct ContentView: View {
                 }
                 upsertPendingExam(exam)
                 isGeneratingExam = false
+                await refreshUsageStatus()
                 selectedMode = .kid
             } catch APIError.unauthorized {
                 isGeneratingExam = false
                 handleUnauthorizedSession()
+            } catch APIError.usageLimitExceeded(let message) {
+                isGeneratingExam = false
+                saveErrorMessage = message
+                await refreshUsageStatus()
             } catch {
                 isGeneratingExam = false
                 saveErrorMessage = error.localizedDescription
@@ -1813,7 +1977,9 @@ struct AuthTitleView: View {
 
 struct ChildProfileView: View {
     let profiles: [ChildProfile]
+    let usageStatus: UsageStatus?
     let onSaveProfile: (String, Int, String, KidAvatar) -> Void
+    let onUpgrade: () -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var childName = ""
@@ -1828,11 +1994,16 @@ struct ChildProfileView: View {
         Group {
             if usesWideLayout {
                 HStack(alignment: .top, spacing: 18) {
-                    profileForm.frame(maxWidth: 460)
+                    VStack(spacing: 16) {
+                        PlanUsageCard(usageStatus: usageStatus, onUpgrade: onUpgrade)
+                        profileForm
+                    }
+                    .frame(maxWidth: 460)
                     profileList
                 }
             } else {
                 VStack(spacing: 16) {
+                    PlanUsageCard(usageStatus: usageStatus, onUpgrade: onUpgrade)
                     profileForm
                     profileList
                 }
@@ -1868,6 +2039,136 @@ struct ChildProfileView: View {
                 LazyVStack(spacing: 12) { ForEach(profiles) { ProfileRow(profile: $0) } }
             }
         }
+    }
+}
+
+struct PlanUsageCard: View {
+    let usageStatus: UsageStatus?
+    let onUpgrade: () -> Void
+
+    var body: some View {
+        sectionCard(title: "Plan & Usage", icon: "sparkles.rectangle.stack.fill") {
+            VStack(alignment: .leading, spacing: 14) {
+                if let usageStatus {
+                    usageRows(for: usageStatus)
+                    if !usageStatus.isPremium {
+                        Button(action: onUpgrade) {
+                            Label("Upgrade to Premium", systemImage: "star.circle.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(CheerfulButtonStyle(color: .orange))
+                    }
+                } else {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .tint(.orange)
+                        Text("Loading plan details...")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func usageRows(for status: UsageStatus) -> some View {
+        VStack(spacing: 10) {
+            usageRow(icon: "person.crop.circle.fill", title: "Plan", value: status.displayPlan)
+            if status.isPremium {
+                usageRow(icon: "infinity.circle.fill", title: "Questions", value: "Unlimited")
+                usageRow(icon: "sparkles", title: "AI Insights", value: "1 per day per child")
+            } else {
+                usageRow(icon: "questionmark.circle.fill", title: "Questions this week", value: "\(status.questionsUsedThisWeek) / \(status.weeklyQuestionLimit ?? 200)")
+                usageRow(icon: "sparkles", title: "AI Insights this week", value: "\(status.insightsUsedThisWeek) / \(status.weeklyInsightLimit ?? 1)")
+            }
+            usageRow(icon: "person.2.fill", title: "Children", value: "\(status.childrenUsed) / \(status.childrenLimit)")
+            usageRow(icon: "chart.line.uptrend.xyaxis.circle.fill", title: "Performance tracking", value: "Enabled")
+            usageRow(icon: "icloud.fill", title: "Cloud sync", value: "Enabled")
+        }
+    }
+
+    private func usageRow(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.headline)
+                .foregroundStyle(.orange)
+                .frame(width: 28, height: 28)
+                .background(Color.orange.opacity(0.12))
+                .clipShape(Circle())
+
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 10)
+
+            Text(value)
+                .font(.headline)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+struct PremiumComingSoonView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            LittleScholarBackground()
+                .overlay {
+                    ScrollView {
+                        VStack(spacing: 18) {
+                            sectionCard(title: "Premium coming soon", icon: "star.circle.fill") {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    Text("Upgrade to Premium")
+                                        .font(.largeTitle.bold())
+                                        .foregroundStyle(.orange)
+
+                                    PremiumBenefitRow(icon: "person.2.fill", title: "Up to 5 children")
+                                    PremiumBenefitRow(icon: "infinity.circle.fill", title: "Unlimited question generation")
+                                    PremiumBenefitRow(icon: "sparkles", title: "Daily AI insight per child")
+                                    PremiumBenefitRow(icon: "chart.bar.doc.horizontal.fill", title: "Advanced learning reports")
+                                    PremiumBenefitRow(icon: "doc.richtext.fill", title: "Future PDF reports")
+                                }
+                            }
+                        }
+                        .padding()
+                        .adaptiveContentWidth(maxWidth: 680)
+                    }
+                }
+                .navigationTitle("Premium")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+        }
+    }
+}
+
+struct PremiumBenefitRow: View {
+    let icon: String
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.orange)
+                .frame(width: 36, height: 36)
+                .background(Color.orange.opacity(0.14))
+                .clipShape(Circle())
+            Text(title)
+                .font(.headline)
+            Spacer()
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -2479,7 +2780,9 @@ struct AIInsightsView: View {
     let results: [ExamResult]
     let cachedInsights: [AIInsight]
     let apiClient: APIClient
+    let usageStatus: UsageStatus?
     let onInsightGenerated: (AIInsightResponseDTO, ChildProfile) -> Void
+    let onRefreshUsage: () -> Void
     let onUnauthorized: () -> Void
 
     @State private var selectedProfileID: UUID?
@@ -2633,6 +2936,13 @@ struct AIInsightsView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
 
+                            if let usageStatus, !usageStatus.canGenerateInsight {
+                                Label("AI insight limit reached. Please try again later or upgrade to Premium.", systemImage: "clock.badge.exclamationmark.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.orange)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
                             if let insightErrorMessage {
                                 Label(insightErrorMessage, systemImage: "exclamationmark.triangle.fill")
                                     .font(.subheadline.weight(.semibold))
@@ -2705,6 +3015,10 @@ struct AIInsightsView: View {
 
     private func generateAIInsight() {
         guard let insightRequest, let selectedProfile, canGenerateInsight else { return }
+        if let usageStatus, !usageStatus.canGenerateInsight {
+            insightErrorMessage = "AI insight limit reached. Please try again later or upgrade to Premium."
+            return
+        }
         isGeneratingInsight = true
         insightErrorMessage = nil
 
@@ -2713,10 +3027,12 @@ struct AIInsightsView: View {
                 let response = try await apiClient.generateAnalyticsInsight(request: insightRequest)
                 generatedInsight = response
                 onInsightGenerated(response, selectedProfile)
+                onRefreshUsage()
             } catch APIError.unauthorized {
                 onUnauthorized()
-            } catch APIError.tokenLimitExceeded {
-                insightErrorMessage = APIError.tokenLimitExceeded.localizedDescription
+            } catch APIError.usageLimitExceeded(let message) {
+                insightErrorMessage = message
+                onRefreshUsage()
             } catch {
                 insightErrorMessage = "Could not generate AI insight right now. Please try again in a little while."
             }
@@ -2786,8 +3102,6 @@ struct AIInsightDisplayData {
     let recommendations: [String]
     let suggestedDifficulty: String
     let generatedAt: String
-    let tokensUsed: Int
-    let remainingTokens: Int
 
     init(response: AIInsightResponseDTO) {
         summary = response.summary
@@ -2796,8 +3110,6 @@ struct AIInsightDisplayData {
         recommendations = response.recommendations
         suggestedDifficulty = response.suggestedDifficulty
         generatedAt = response.createdAt
-        tokensUsed = response.usage?.tokensUsed ?? 0
-        remainingTokens = response.usage?.remainingTokens ?? 0
     }
 
     init(insight: AIInsight) {
@@ -2807,8 +3119,6 @@ struct AIInsightDisplayData {
         recommendations = insight.recommendations
         suggestedDifficulty = insight.suggestedDifficulty
         generatedAt = DateFormatter.localizedString(from: insight.generatedAt, dateStyle: .medium, timeStyle: .short)
-        tokensUsed = insight.tokensUsed
-        remainingTokens = insight.remainingTokens
     }
 }
 
@@ -2857,11 +3167,6 @@ struct AIInsightResultView: View {
                     Text("Generated at: \(insight.generatedAt)")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    if insight.tokensUsed > 0 || insight.remainingTokens > 0 {
-                        Text("Tokens used: \(insight.tokensUsed) • Remaining: \(insight.remainingTokens)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
