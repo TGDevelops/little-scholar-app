@@ -38,7 +38,7 @@ struct ChildProfileView: View {
                         Label("Add Kid Profile", systemImage: "plus.circle.fill")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(CheerfulButtonStyle(color: .orange))
+                    .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                     .disabled(childName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
@@ -69,7 +69,7 @@ struct ProfileRow: View {
         HStack(spacing: 12) {
             Image(systemName: KidAvatar.avatar(for: profile.avatar).icon)
                 .font(.title)
-                .foregroundStyle(.orange)
+                .foregroundStyle(ScholarTheme.primary)
                 .frame(width: 42)
 
             VStack(alignment: .leading, spacing: 4) {

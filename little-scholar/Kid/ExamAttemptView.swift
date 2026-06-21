@@ -14,7 +14,7 @@ struct ExamAttemptView: View {
     var body: some View {
         VStack(spacing: 16) {
             VStack(spacing: 6) {
-                Text("\(exam.childName)'s \(exam.subject) Exam")
+                Text("\(exam.childName)'s \(exam.subject) Practice")
                     .font(.title2.bold())
                 Text("Question \(currentIndex + 1) of \(exam.questions.count)")
                     .font(.headline)
@@ -23,7 +23,7 @@ struct ExamAttemptView: View {
             .padding(.horizontal)
 
             ProgressView(value: Double(currentIndex + 1), total: Double(exam.questions.count))
-                .tint(.orange)
+                .tint(ScholarTheme.primary)
                 .padding(.horizontal)
 
             VStack(alignment: .leading, spacing: 18) {
@@ -44,7 +44,7 @@ struct ExamAttemptView: View {
                                 .multilineTextAlignment(.leading)
                         }
                         .padding()
-                        .background(answers[currentQuestion.id] == option ? Color.green.opacity(0.24) : Color.white.opacity(0.82))
+                        .background(answers[currentQuestion.id] == option ? ScholarTheme.success.opacity(0.18) : ScholarTheme.cardBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     .buttonStyle(.plain)
@@ -76,7 +76,7 @@ struct ExamAttemptView: View {
                     Label(currentIndex == exam.questions.count - 1 ? "Submit" : "Next", systemImage: "arrow.right.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(CheerfulButtonStyle(color: .orange))
+                .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                 .disabled(answers[currentQuestion.id] == nil)
             }
             .padding(.horizontal)
@@ -143,7 +143,7 @@ struct KidExamListView: View {
                             VStack(spacing: 8) {
                                 Image(systemName: KidAvatar.avatar(for: profile.avatar).icon)
                                     .font(.system(size: 34))
-                                    .foregroundStyle(selectedProfileID == profile.persistentModelID ? .green : .orange)
+                                    .foregroundStyle(selectedProfileID == profile.persistentModelID ? ScholarTheme.primary : ScholarTheme.secondaryText)
                                 Text(profile.name)
                                     .font(.title3.bold())
                                     .foregroundStyle(.primary)
@@ -154,7 +154,7 @@ struct KidExamListView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(selectedProfileID == profile.persistentModelID ? Color.green.opacity(0.2) : Color.white.opacity(0.85))
+                            .background(selectedProfileID == profile.persistentModelID ? ScholarTheme.primarySoft.opacity(0.35) : ScholarTheme.cardBackground)
                             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                         }
                         .buttonStyle(.plain)
@@ -165,19 +165,19 @@ struct KidExamListView: View {
     }
 
     private var assignedExams: some View {
-        sectionCard(title: "Your Exam Papers", icon: "doc.text.fill") {
+        sectionCard(title: "Your Practice", icon: "doc.text.fill") {
             if selectedProfile == nil {
-                EmptyStateView(icon: "hand.tap.fill", title: "Tap your profile", message: "Then your exam papers will appear here.")
+                EmptyStateView(icon: "hand.tap.fill", title: "Tap your profile", message: "Then your practice will appear here.")
             } else if examsForSelectedProfile.isEmpty {
                 VStack(spacing: 14) {
-                    EmptyStateView(icon: "doc.badge.clock", title: "No exam assigned", message: "Ask a parent to generate an exam paper for you.")
+                    EmptyStateView(icon: "doc.badge.clock", title: "No practice assigned", message: "Ask a parent to generate practice for you.")
                     Button {
                         onCreateExam()
                     } label: {
-                        Label("Go to Exam Mode", systemImage: "doc.badge.plus")
+                        Label("Go to Practice", systemImage: "doc.badge.plus")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(CheerfulButtonStyle(color: .teal))
+                    .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                 }
             } else {
                 LazyVStack(spacing: 12) {
@@ -223,14 +223,14 @@ struct ExamStartRow: View {
                 Spacer()
                 Text(exam.difficulty)
                     .font(.headline)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ScholarTheme.primary)
             }
             Text("\(exam.questions.count) questions • \(exam.createdAt.formatted(date: .abbreviated, time: .shortened))")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text("Start Exam")
+            Text("Start Practice")
                 .font(.headline)
-                .foregroundStyle(.teal)
+                .foregroundStyle(ScholarTheme.primary)
         }
         .padding()
         .background(Color.white.opacity(0.9))

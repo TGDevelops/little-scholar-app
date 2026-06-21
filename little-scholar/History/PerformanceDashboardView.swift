@@ -9,7 +9,7 @@ struct PerformanceDashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                sectionCard(title: "Performance Dashboard", icon: "chart.bar.fill") {
+                sectionCard(title: "Progress", icon: "chart.bar.fill") {
                     if profiles.isEmpty {
                         EmptyStateView(icon: "person.2.slash", title: "No kids yet", message: "Create kid profiles to view performance history.")
                     } else {
@@ -50,9 +50,9 @@ struct HistorySummary: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SummaryTile(title: "Exams", value: "\(results.count)", color: .orange)
-            SummaryTile(title: "Average", value: "\(average)%", color: .teal)
-            SummaryTile(title: "Best", value: "\(results.map(\.percentage).max() ?? 0)%", color: .pink)
+            SummaryTile(title: "Practice", value: "\(results.count)", color: ScholarTheme.primary)
+            SummaryTile(title: "Average", value: "\(average)%", color: ScholarTheme.success)
+            SummaryTile(title: "Best", value: "\(results.map(\.percentage).max() ?? 0)%", color: ScholarTheme.warning)
         }
     }
 }

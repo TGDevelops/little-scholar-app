@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import PhotosUI
 import SwiftData
 import SwiftUI
 import UIKit
@@ -98,9 +99,9 @@ final class ExamResult {
     var feedback: String {
         switch percentage {
         case 90...100: "Fantastic focus! You are ready for a bigger challenge."
-        case 75..<90: "Great work! Review the missed questions and try one harder exam."
+        case 75..<90: "Great work! Review the missed questions and try one harder practice."
         case 50..<75: "Good effort. A little more practice will make these ideas clearer."
-        default: "Nice try. Practice with an easy exam and ask a grown-up for help."
+        default: "Nice try. Start with an easy practice and ask a grown-up for help."
         }
     }
 }
@@ -228,11 +229,11 @@ enum KidAvatar: String, CaseIterable, Identifiable, Codable {
 
     var color: Color {
         switch self {
-        case .unicorn: .purple
-        case .princess: .pink
-        case .superhero: .red
-        case .spaceHero: .blue
-        case .shieldHero: .indigo
+        case .unicorn: ScholarTheme.lavender
+        case .princess: ScholarTheme.coral
+        case .superhero: ScholarTheme.primary
+        case .spaceHero: ScholarTheme.sky
+        case .shieldHero: ScholarTheme.mint
         }
     }
 
@@ -242,26 +243,72 @@ enum KidAvatar: String, CaseIterable, Identifiable, Codable {
 }
 
 enum ScholarTheme {
-    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
-    static let elevatedSurface = Color(uiColor: .tertiarySystemGroupedBackground)
-    static let controlSurface = Color(uiColor: .systemBackground)
-    static let shadow = Color(uiColor: .black).opacity(0.10)
+    static let primary = adaptive(light: UIColor(red: 0.325, green: 0.392, blue: 0.220, alpha: 1), dark: UIColor(red: 0.780, green: 0.882, blue: 0.568, alpha: 1))
+    static let darkOlive = adaptive(light: UIColor(red: 0.333, green: 0.388, blue: 0.247, alpha: 1), dark: UIColor(red: 0.690, green: 0.800, blue: 0.488, alpha: 1))
+    static let primaryContainer = adaptive(light: UIColor(red: 0.420, green: 0.490, blue: 0.310, alpha: 1), dark: UIColor(red: 0.243, green: 0.310, blue: 0.157, alpha: 1))
+    static let primarySoft = adaptive(light: UIColor(red: 0.839, green: 0.918, blue: 0.702, alpha: 1), dark: UIColor(red: 0.243, green: 0.310, blue: 0.157, alpha: 1))
+    static let background = adaptive(light: UIColor(red: 0.984, green: 0.976, blue: 0.953, alpha: 1), dark: UIColor(red: 0.067, green: 0.074, blue: 0.059, alpha: 1))
+    static let surface = adaptive(light: UIColor(red: 0.984, green: 0.976, blue: 0.953, alpha: 1), dark: UIColor(red: 0.094, green: 0.102, blue: 0.082, alpha: 1))
+    static let cardBackground = adaptive(light: UIColor(red: 0.988, green: 0.988, blue: 0.980, alpha: 1), dark: UIColor(red: 0.130, green: 0.137, blue: 0.114, alpha: 1))
+    static let surfaceContainerLow = adaptive(light: UIColor(red: 0.961, green: 0.957, blue: 0.929, alpha: 1), dark: UIColor(red: 0.116, green: 0.125, blue: 0.102, alpha: 1))
+    static let surfaceContainer = adaptive(light: UIColor(red: 0.937, green: 0.933, blue: 0.906, alpha: 1), dark: UIColor(red: 0.153, green: 0.165, blue: 0.133, alpha: 1))
+    static let surfaceContainerHigh = adaptive(light: UIColor(red: 0.918, green: 0.910, blue: 0.886, alpha: 1), dark: UIColor(red: 0.188, green: 0.200, blue: 0.165, alpha: 1))
+    static let surfaceVariant = adaptive(light: UIColor(red: 0.894, green: 0.886, blue: 0.863, alpha: 1), dark: UIColor(red: 0.224, green: 0.235, blue: 0.200, alpha: 1))
+    static let inputSurface = adaptive(light: UIColor(red: 0.914, green: 0.929, blue: 0.894, alpha: 1), dark: UIColor(red: 0.165, green: 0.188, blue: 0.133, alpha: 1))
+    static let onSurface = adaptive(light: UIColor(red: 0.106, green: 0.110, blue: 0.094, alpha: 1), dark: UIColor(red: 0.949, green: 0.953, blue: 0.929, alpha: 1))
+    static let onSurfaceVariant = adaptive(light: UIColor(red: 0.271, green: 0.282, blue: 0.243, alpha: 1), dark: UIColor(red: 0.773, green: 0.800, blue: 0.714, alpha: 1))
+    static let outline = adaptive(light: UIColor(red: 0.459, green: 0.471, blue: 0.427, alpha: 1), dark: UIColor(red: 0.624, green: 0.647, blue: 0.565, alpha: 1))
+    static let outlineVariant = adaptive(light: UIColor(red: 0.773, green: 0.784, blue: 0.729, alpha: 1), dark: UIColor(red: 0.318, green: 0.337, blue: 0.278, alpha: 1))
+    static let secondaryContainer = adaptive(light: UIColor(red: 0.847, green: 0.914, blue: 0.733, alpha: 1), dark: UIColor(red: 0.204, green: 0.278, blue: 0.122, alpha: 1))
+    static let tertiary = adaptive(light: UIColor(red: 0.475, green: 0.322, blue: 0.435, alpha: 1), dark: UIColor(red: 0.875, green: 0.690, blue: 0.835, alpha: 1))
+    static let primaryText = onSurface
+    static let secondaryText = onSurfaceVariant
+    static let success = adaptive(light: UIColor(red: 0.48, green: 0.60, blue: 0.35, alpha: 1), dark: UIColor(red: 0.62, green: 0.78, blue: 0.42, alpha: 1))
+    static let warning = adaptive(light: UIColor(red: 0.83, green: 0.66, blue: 0.35, alpha: 1), dark: UIColor(red: 0.96, green: 0.77, blue: 0.42, alpha: 1))
+    static let error = adaptive(light: UIColor(red: 0.729, green: 0.102, blue: 0.102, alpha: 1), dark: UIColor(red: 1.000, green: 0.596, blue: 0.596, alpha: 1))
+    static let sky = adaptive(light: UIColor(red: 0.55, green: 0.63, blue: 0.70, alpha: 1), dark: UIColor(red: 0.62, green: 0.76, blue: 0.90, alpha: 1))
+    static let mint = adaptive(light: UIColor(red: 0.48, green: 0.60, blue: 0.35, alpha: 1), dark: UIColor(red: 0.62, green: 0.78, blue: 0.42, alpha: 1))
+    static let coral = adaptive(light: UIColor(red: 0.729, green: 0.102, blue: 0.102, alpha: 1), dark: UIColor(red: 1.000, green: 0.596, blue: 0.596, alpha: 1))
+    static let lavender = adaptive(light: UIColor(red: 0.62, green: 0.58, blue: 0.70, alpha: 1), dark: UIColor(red: 0.78, green: 0.72, blue: 0.94, alpha: 1))
+    static let honey = adaptive(light: UIColor(red: 0.83, green: 0.66, blue: 0.35, alpha: 1), dark: UIColor(red: 0.96, green: 0.77, blue: 0.42, alpha: 1))
+    static let cream = background
+    static let mist = surfaceContainerLow
+    static let elevatedSurface = adaptive(light: UIColor.white.withAlphaComponent(0.72), dark: UIColor(red: 0.157, green: 0.169, blue: 0.137, alpha: 0.86))
+    static let controlSurface = adaptive(light: UIColor(red: 0.937, green: 0.933, blue: 0.906, alpha: 1), dark: UIColor(red: 0.180, green: 0.196, blue: 0.157, alpha: 1))
+    static let shadow = adaptive(light: UIColor.black.withAlphaComponent(0.035), dark: UIColor.black.withAlphaComponent(0.32))
+    static let ink = onSurface
+    static let muted = onSurfaceVariant
+
+    static func hairline(_ opacity: CGFloat = 1) -> Color {
+        adaptive(
+            light: UIColor.black.withAlphaComponent(0.04 * opacity),
+            dark: UIColor.white.withAlphaComponent(0.10 * opacity)
+        )
+    }
+
+    private static func adaptive(light: UIColor, dark: UIColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
+        })
+    }
 }
 
 enum AppMode: String, CaseIterable, Identifiable {
-    case parent = "Parent"
-    case exam = "Exam"
-    case kid = "Kid"
-    case history = "History"
+    case home = "Home"
+    case practice = "Practice"
+    case progress = "Progress"
+    case insights = "Insights"
+    case profile = "Profile"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .parent: "person.2.fill"
-        case .exam: "doc.text.fill"
-        case .kid: "figure.child.circle.fill"
-        case .history: "chart.bar.doc.horizontal.fill"
+        case .home: "house.fill"
+        case .practice: "square.and.pencil"
+        case .progress: "chart.line.uptrend.xyaxis"
+        case .insights: "sparkles"
+        case .profile: "person.crop.circle.fill"
         }
     }
 }
@@ -544,11 +591,13 @@ struct ContentView: View {
     @AppStorage("parentIsRegistered") private var parentIsRegistered = false
     @AppStorage("parentIsLoggedIn") private var parentIsLoggedIn = false
 
-    @State private var selectedMode: AppMode = .parent
+    @State private var selectedMode: AppMode = .home
+    @State private var selectedChildID: UUID?
     @State private var latestResult: ExamResult?
     @State private var saveErrorMessage: String?
     @State private var isGeneratingExam = false
     @State private var showingLogin = false
+    @State private var showingPremiumPlaceholder = false
 
     private let answerEvaluation = AnswerEvaluationService()
 
@@ -592,38 +641,82 @@ struct ContentView: View {
                 migrateLegacyRecordsToCurrentParentIfNeeded()
                 repairDuplicateProfileIDs()
                 removeInvalidPendingExams()
+                ensureSelectedChild()
+            }
+            .onChange(of: currentParentProfiles.map(\.profileID)) { _, _ in
+                ensureSelectedChild()
+            }
+            .sheet(isPresented: $showingPremiumPlaceholder) {
+                PremiumComingSoonView()
             }
         }
     }
 
     private var mainAppShell: some View {
-        VStack(spacing: 14) {
-            HeaderView(parentName: parentName, onLogout: { parentIsLoggedIn = false })
-            ModeNavigation(selectedMode: $selectedMode)
-            content
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                LSTopAppBar(
+                    parentName: parentName
+                )
+                content
+                    .animation(.easeInOut(duration: 0.22), value: selectedMode)
+            }
+
+            LSBottomTabBar(selectedMode: $selectedMode)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 10)
         }
-        .padding(.top, 8)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     @ViewBuilder
     private var content: some View {
         switch selectedMode {
-        case .parent:
-            ScrollView { ChildProfileView(profiles: currentParentProfiles, onSaveProfile: saveProfile).padding() }
-        case .exam:
-            ScrollView { ExamSetupView(profiles: currentParentProfiles, exams: displayableExams, isGenerating: isGeneratingExam, onGenerateExam: generateExam).padding() }
-        case .kid:
-            KidExamListView(
+        case .home:
+            HomeScreen(
+                parentName: parentName,
                 profiles: currentParentProfiles,
-                exams: currentParentExams.filter { !$0.isCompleted },
-                latestResult: latestResult,
-                onSubmit: evaluateExam,
-                onCreateExam: { selectedMode = .exam },
-                onDeleteProfile: deleteProfile,
-                onUpdateProfile: updateProfile
+                selectedChildID: $selectedChildID,
+                results: currentParentResults,
+                onGeneratePractice: { selectedMode = .practice },
+                onViewInsights: { selectedMode = .insights },
+                onAddLearner: { selectedMode = .profile }
             )
-        case .history:
-            PerformanceDashboardView(profiles: currentParentProfiles, results: currentParentResults)
+        case .practice:
+            PracticeScreen(
+                profiles: currentParentProfiles,
+                selectedChildID: $selectedChildID,
+                exams: displayableExams.filter { !$0.isCompleted },
+                isGenerating: isGeneratingExam,
+                onGenerateExam: generateExam,
+                onSubmit: evaluateExam
+            )
+        case .progress:
+            ProgressScreen(
+                profiles: currentParentProfiles,
+                selectedChildID: $selectedChildID,
+                results: currentParentResults
+            )
+        case .insights:
+            InsightsScreen(
+                profiles: currentParentProfiles,
+                selectedChildID: $selectedChildID,
+                results: currentParentResults
+            )
+        case .profile:
+            ProfileScreen(
+                parentName: parentName,
+                parentEmail: parentEmail,
+                parentCity: parentCity,
+                profiles: currentParentProfiles,
+                selectedChildID: $selectedChildID,
+                results: currentParentResults,
+                onSaveProfile: saveProfile,
+                onDeleteProfile: deleteProfile,
+                onUpdateProfile: updateProfile,
+                onUpgrade: { showingPremiumPlaceholder = true },
+                onLogout: logoutParent
+            )
         }
     }
 
@@ -684,7 +777,7 @@ struct ContentView: View {
         parentCity = payload.user.city
         parentAccessToken = payload.accessToken
         latestResult = nil
-        selectedMode = .parent
+        selectedMode = .home
         parentIsRegistered = true
         parentIsLoggedIn = true
     }
@@ -696,16 +789,31 @@ struct ContentView: View {
         parentCity = ""
         parentAccessToken = ""
         latestResult = nil
-        selectedMode = .parent
+        selectedMode = .home
         parentIsRegistered = false
         parentIsLoggedIn = false
     }
 
-    private func saveProfile(name: String, age: Int, grade: String, avatar: KidAvatar) {
+    private func logoutParent() {
+        parentIsLoggedIn = false
+        latestResult = nil
+        selectedMode = .home
+    }
+
+    private func ensureSelectedChild() {
+        if let selectedChildID, currentParentProfiles.contains(where: { $0.profileID == selectedChildID }) {
+            return
+        }
+        selectedChildID = currentParentProfiles.first?.profileID
+    }
+
+    private func saveProfile(name: String, age: Int, grade: String, avatar: String) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
         do {
-            modelContext.insert(ChildProfile(parentID: parentID, name: trimmedName, age: age, grade: grade, avatar: avatar))
+            let profile = ChildProfile(parentID: parentID, name: trimmedName, age: age, grade: grade)
+            profile.avatar = avatar
+            modelContext.insert(profile)
             try modelContext.save()
         } catch {
             saveErrorMessage = error.localizedDescription
@@ -733,7 +841,7 @@ struct ContentView: View {
         }
     }
 
-    private func updateProfile(_ profile: ChildProfile, name: String, age: Int, grade: String, avatar: KidAvatar) {
+    private func updateProfile(_ profile: ChildProfile, name: String, age: Int, grade: String, avatar: String) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard profile.parentID == parentID, !trimmedName.isEmpty else { return }
 
@@ -742,7 +850,7 @@ struct ContentView: View {
             profile.name = trimmedName
             profile.age = age
             profile.grade = grade
-            profile.avatar = avatar.rawValue
+            profile.avatar = avatar
 
             for exam in currentParentExams where exam.childProfileID == profileID {
                 exam.childName = trimmedName
@@ -772,7 +880,7 @@ struct ContentView: View {
                 modelContext.insert(exam)
                 try modelContext.save()
                 isGeneratingExam = false
-                selectedMode = .kid
+                selectedMode = .practice
             } catch {
                 isGeneratingExam = false
                 saveErrorMessage = error.localizedDescription
@@ -897,12 +1005,14 @@ struct ParentRegistrationView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                AuthTitleView(title: "Parent Registration", subtitle: "Create your parent account.")
+        PremiumScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                AuthTitleView(title: "Welcome to Exam Buddy", subtitle: "Create a calm learning space for your child.")
 
-                sectionCard(title: "Parent Details", icon: "person.crop.circle.badge.plus") {
+                LSCard {
                     VStack(spacing: 14) {
+                        LSSectionHeader(title: "Parent Details", subtitle: "Your private parent account", icon: "person.crop.circle.badge.plus")
+
                         TextField("Parent Name", text: $name)
                             .textFieldStyle(.roundedBorder)
                             .font(.title3)
@@ -950,18 +1060,17 @@ struct ParentRegistrationView: View {
                             Label(isSubmitting ? "Registering..." : "Register Parent", systemImage: "checkmark.circle.fill")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(CheerfulButtonStyle(color: .orange))
+                        .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                         .disabled(!canRegister)
 
                         Button(action: onGoToLogin) {
                             Label("Already registered? Login", systemImage: "arrow.right.circle.fill")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(CheerfulButtonStyle(color: .teal))
+                        .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                     }
                 }
             }
-            .padding()
             .adaptiveContentWidth(maxWidth: 620)
         }
     }
@@ -979,12 +1088,14 @@ struct ParentLoginView: View {
     @State private var showLoginError = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                AuthTitleView(title: "Parent Login", subtitle: "Welcome back, \(parentName).")
+        PremiumScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                AuthTitleView(title: "Welcome back", subtitle: "Continue supporting your child's practice.")
 
-                sectionCard(title: "Login", icon: "lock.fill") {
+                LSCard {
                     VStack(spacing: 14) {
+                        LSSectionHeader(title: "Login", subtitle: "Signed in as \(parentName)", icon: "lock.fill")
+
                         TextField("Email", text: $email)
                             .textFieldStyle(.roundedBorder)
                             .font(.title3)
@@ -1002,7 +1113,7 @@ struct ParentLoginView: View {
                         if showLoginError {
                             Label("Login failed. Check your email and password.", systemImage: "exclamationmark.triangle.fill")
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.red)
+                                .foregroundStyle(ScholarTheme.coral)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
@@ -1016,16 +1127,15 @@ struct ParentLoginView: View {
                             Label(isSubmitting ? "Logging in..." : "Login", systemImage: "arrow.right.circle.fill")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(CheerfulButtonStyle(color: .teal))
+                        .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                         .disabled(email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty || isSubmitting)
 
                         Button("Register a different parent", action: onRegisterAgain)
                             .font(.headline)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(ScholarTheme.primary)
                     }
                 }
             }
-            .padding()
             .adaptiveContentWidth(maxWidth: 560)
         }
     }
@@ -1036,10 +1146,11 @@ struct AuthTitleView: View {
     let subtitle: String
 
     var body: some View {
-        VStack(spacing: 8) {
+        LSHeroCard {
+            VStack(alignment: .leading, spacing: 10) {
             Image(systemName: "graduationcap.circle.fill")
                 .font(.system(size: 64))
-                .foregroundStyle(.orange)
+                .foregroundStyle(ScholarTheme.primary)
             Text("Little Scholar")
                 .font(.largeTitle.bold())
             Text(title)
@@ -1047,15 +1158,874 @@ struct AuthTitleView: View {
             Text(subtitle)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity)
     }
 }
 
+struct HomeScreen: View {
+    let parentName: String
+    let profiles: [ChildProfile]
+    @Binding var selectedChildID: UUID?
+    let results: [ExamResult]
+    let onGeneratePractice: () -> Void
+    let onViewInsights: () -> Void
+    let onAddLearner: () -> Void
+
+    private var selectedProfile: ChildProfile? { selectedChild(in: profiles, selectedChildID: selectedChildID) }
+    private var selectedResults: [ExamResult] { resultsForSelectedChild(results, childID: selectedProfile?.profileID) }
+    private var latestResults: [ExamResult] { Array(selectedResults.prefix(3)) }
+    private var statsColumn: some View {
+        VStack(spacing: 24) {
+            LSMetricTile(title: "Avg. Score", value: "\(averageScore(selectedResults))%", detail: selectedResults.isEmpty ? "First session pending" : "+4% this week", icon: "chart.line.uptrend.xyaxis")
+            LSMetricTile(title: "Sessions Completed", value: "\(selectedResults.count)", detail: "Last 7 days", icon: "scroll")
+            LSMetricTile(title: "Best Score", value: "\(bestScore(selectedResults))%", detail: bestSubjectLabel, icon: "trophy")
+        }
+    }
+    private var activityColumn: some View {
+        VStack(spacing: 24) {
+            AIRecommendationCard(
+                results: selectedResults,
+                onViewInsights: onViewInsights
+            )
+
+            LSCard {
+                VStack(alignment: .leading, spacing: 24) {
+                    Text("Recent Activity")
+                        .font(.title.bold())
+                        .foregroundStyle(ScholarTheme.onSurface)
+                    if latestResults.isEmpty {
+                        LSEmptyState(icon: "sparkle.magnifyingglass", title: "No completed practice yet", message: "Generated practice sessions will become progress moments after your child submits them.")
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(latestResults) { result in
+                                PremiumResultRow(result: result)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: .now)
+        let name = parentName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = name.isEmpty ? "" : ", \(name)"
+        switch hour {
+        case 5..<12: return "Good Morning\(displayName)"
+        case 12..<17: return "Good Afternoon\(displayName)"
+        case 17..<22: return "Good Evening\(displayName)"
+        default: return name.isEmpty ? "Welcome back" : "Welcome back, \(name)"
+        }
+    }
+
+    var body: some View {
+        PremiumScrollView {
+            VStack(alignment: .leading, spacing: 64) {
+                if profiles.isEmpty {
+                    LSEmptyState(
+                        icon: "person.crop.circle.badge.plus",
+                        title: "Create your first learner",
+                        message: "Add a child profile in Profile to begin practice and progress tracking."
+                    )
+                } else if let selectedProfile {
+                    VStack(alignment: .leading, spacing: 24) {
+                        Text("Select Learner")
+                            .font(.caption.weight(.semibold))
+                            .textCase(.uppercase)
+                            .tracking(2.6)
+                            .foregroundStyle(ScholarTheme.onSurfaceVariant)
+
+                        LSChildCarousel(
+                            profiles: profiles,
+                            selectedChildID: $selectedChildID,
+                            results: results,
+                            includesAddLearner: false,
+                            onAddLearner: onAddLearner
+                        )
+                    }
+
+                    LSTonalPanel {
+                        VStack(alignment: .leading, spacing: 40) {
+                            LSActionHeader(
+                                title: "\(selectedProfile.name)'s Overview",
+                                buttonTitle: "Generate Practice",
+                                buttonIcon: "play.fill",
+                                action: onGeneratePractice
+                            )
+
+                            LSResponsiveColumns(spacing: 24, leadingMinWidth: 280, trailingMinWidth: 420) {
+                                statsColumn
+                            } trailing: {
+                                activityColumn
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var learningSummary: String {
+        guard !selectedResults.isEmpty else {
+            return "Learning Summary: Start with a short practice session to build the first progress snapshot."
+        }
+        if averageScore(selectedResults) >= 80 {
+            return "Learning Summary: \(selectedProfile?.name ?? "Your child") is building strong momentum across recent practice."
+        }
+        return "Learning Summary: Keep sessions short and steady to strengthen confidence this week."
+    }
+
+    private var bestSubjectLabel: String {
+        guard let best = subjectSummaries(selectedResults).max(by: { $0.average < $1.average }) else {
+            return "Build a baseline"
+        }
+        return "in \(best.subject)"
+    }
+}
+
+struct PracticeScreen: View {
+    let profiles: [ChildProfile]
+    @Binding var selectedChildID: UUID?
+    let exams: [Exam]
+    let isGenerating: Bool
+    let onGenerateExam: (ChildProfile, Subject, Difficulty, Int) -> Void
+    let onSubmit: (Exam, [UUID: String]) -> ExamResult?
+
+    @State private var selectedSubject: Subject = .maths
+    @State private var selectedDifficulty: Difficulty = .easy
+    @State private var numberOfQuestions = 5
+    @State private var selectedExam: Exam?
+    @State private var completedResult: ExamResult?
+
+    private var selectedProfile: ChildProfile? { selectedChild(in: profiles, selectedChildID: selectedChildID) }
+    private var practicesForChild: [Exam] {
+        guard let selectedProfile else { return [] }
+        return exams.filter { $0.childProfileID == selectedProfile.profileID }
+    }
+    private var labSetupCard: some View {
+        LSCard {
+            VStack(alignment: .leading, spacing: 30) {
+                LSSectionHeader(title: "Lab Setup", subtitle: "Configure parameters for the next practice session.", icon: "flask")
+
+                LSResponsiveColumns(spacing: 18, leadingMinWidth: 190, trailingMinWidth: 190) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Subject").font(.subheadline.weight(.semibold))
+                        Picker("Subject", selection: $selectedSubject) {
+                            ForEach(Subject.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(ScholarTheme.primary)
+                        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .background(ScholarTheme.inputSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                } trailing: {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Difficulty Curve").font(.subheadline.weight(.semibold))
+                        Picker("Difficulty", selection: $selectedDifficulty) {
+                            ForEach(Difficulty.allCases) { difficulty in
+                                Text(difficultyDisplay(difficulty)).tag(difficulty)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(ScholarTheme.primary)
+                        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .background(ScholarTheme.inputSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Session Length (Questions)")
+                        .font(.subheadline.weight(.semibold))
+                    HStack(spacing: 14) {
+                        ForEach([5, 10, 20], id: \.self) { count in
+                            LSQuestionCountButton(count: count, selectedCount: $numberOfQuestions)
+                        }
+                    }
+                }
+
+                Divider().opacity(0.45)
+
+                if isGenerating {
+                    LSSkeletonLoadingCard(title: "Creating practice", message: "Building a thoughtful set of questions...")
+                } else {
+                    LSPrimaryButton(title: "Generate New Practice", icon: "sparkles") {
+                        guard let selectedProfile else { return }
+                        onGenerateExam(selectedProfile, selectedSubject, selectedDifficulty, numberOfQuestions)
+                    }
+                }
+            }
+        }
+    }
+    private var pendingSessions: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack {
+                Label("Pending Sessions", systemImage: "clipboard.badge.clock")
+                    .font(.title.bold())
+                    .foregroundStyle(ScholarTheme.onSurface)
+                Spacer()
+                Text("\(practicesForChild.count) Tasks")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(ScholarTheme.tertiary.opacity(0.12))
+                    .foregroundStyle(ScholarTheme.tertiary)
+                    .clipShape(Capsule())
+            }
+
+            if practicesForChild.isEmpty {
+                LSEmptyState(icon: "doc.badge.clock", title: "No practice assigned", message: "Generate a session and it will wait here until your child starts.")
+            } else {
+                VStack(spacing: 22) {
+                    ForEach(practicesForChild) { exam in
+                        PremiumPracticeRow(exam: exam) { selectedExam = exam }
+                    }
+                }
+            }
+        }
+    }
+
+    var body: some View {
+        Group {
+            if let completedResult {
+                ResultView(result: completedResult)
+            } else if let selectedExam {
+                ExamAttemptView(exam: selectedExam) { exam, answers in
+                    if let result = onSubmit(exam, answers) {
+                        self.completedResult = result
+                        self.selectedExam = nil
+                    }
+                }
+            } else {
+                PremiumScrollView {
+                    VStack(alignment: .leading, spacing: 56) {
+                        if profiles.isEmpty {
+                            LSEmptyState(icon: "person.2.slash", title: "Add a learner first", message: "Create a child profile in Profile before generating practice.")
+                        } else {
+                            HStack(alignment: .center, spacing: 18) {
+                                LSInitialAvatar(profile: selectedProfile)
+                                Text("\(selectedProfile?.name ?? "Learner")'s Practice Labs")
+                                    .font(.system(size: 44, weight: .bold))
+                                    .foregroundStyle(ScholarTheme.onSurface)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.72)
+                                Spacer(minLength: 0)
+                            }
+
+                            LSResponsiveColumns(spacing: 28, leadingMinWidth: 430, trailingMinWidth: 320) {
+                                labSetupCard
+                            } trailing: {
+                                pendingSessions
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.22), value: selectedExam?.examID)
+    }
+
+    private func difficultyDisplay(_ difficulty: Difficulty) -> String {
+        switch difficulty {
+        case .easy: "Gentle (Easy)"
+        case .medium: "Balanced (Medium)"
+        case .hard: "Challenging (Hard)"
+        }
+    }
+}
+
+struct ProgressScreen: View {
+    let profiles: [ChildProfile]
+    @Binding var selectedChildID: UUID?
+    let results: [ExamResult]
+
+    private var selectedProfile: ChildProfile? { selectedChild(in: profiles, selectedChildID: selectedChildID) }
+    private var selectedResults: [ExamResult] { resultsForSelectedChild(results, childID: selectedProfile?.profileID) }
+    private var trendCard: some View {
+        LSCard {
+            VStack(alignment: .leading, spacing: 22) {
+                HStack {
+                    Text("Performance Trend")
+                        .font(.title.bold())
+                    Spacer()
+                    Label("Last 30 Days", systemImage: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(ScholarTheme.controlSurface)
+                        .clipShape(Capsule())
+                }
+                PerformanceTrendView(results: selectedResults)
+            }
+        }
+    }
+    private var subjectCard: some View {
+        LSCard {
+            VStack(alignment: .leading, spacing: 26) {
+                Text("Subject Breakdown")
+                    .font(.title.bold())
+                SubjectProgressList(results: selectedResults)
+            }
+        }
+    }
+    private var recentPracticeCard: some View {
+        LSCard {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    Text("Recent Practice")
+                        .font(.title.bold())
+                    Spacer()
+                    Text("View All")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ScholarTheme.primary)
+                }
+                if selectedResults.isEmpty {
+                    LSEmptyState(icon: "clock.badge.questionmark", title: "No completed practice", message: "Completed sessions will appear here.")
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(selectedResults.prefix(5)) { result in
+                            NavigationLink { ResultView(result: result) } label: {
+                                LSRecentExamLine(result: result)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    var body: some View {
+        PremiumScrollView {
+            VStack(alignment: .leading, spacing: 52) {
+                if profiles.isEmpty {
+                    LSEmptyState(icon: "person.2.slash", title: "No learners yet", message: "Create a child profile to begin tracking progress.")
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .bottom) {
+                            progressTitle
+                            Spacer()
+                            onTrackPill
+                        }
+                        VStack(alignment: .leading, spacing: 18) {
+                            progressTitle
+                            onTrackPill
+                        }
+                    }
+
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 155), spacing: 14)], spacing: 14) {
+                        LSMetricTile(title: "Avg Score", value: "\(averageScore(selectedResults))%", detail: selectedResults.isEmpty ? "No sessions yet" : "+2%", icon: "graduationcap")
+                        LSMetricTile(title: "Sessions", value: "\(selectedResults.count)", detail: "this week", icon: "clock")
+                        LSMetricTile(title: "Best Score", value: "\(bestScore(selectedResults))%", detail: bestSubjectLabel, icon: "trophy")
+                    }
+
+                    LSResponsiveColumns(spacing: 24, leadingMinWidth: 520, trailingMinWidth: 280) {
+                        trendCard
+                    } trailing: {
+                        subjectCard
+                    }
+
+                    LSResponsiveColumns(spacing: 24, leadingMinWidth: 420, trailingMinWidth: 320) {
+                        FocusAreasCard(results: selectedResults)
+                    } trailing: {
+                        recentPracticeCard
+                    }
+                }
+            }
+        }
+    }
+
+    private var bestSubjectLabel: String {
+        guard let best = subjectSummaries(selectedResults).max(by: { $0.average < $1.average }) else {
+            return "Build a baseline"
+        }
+        return best.subject
+    }
+
+    private var progressTitle: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("\(selectedProfile?.name ?? "Learner")'s Learning Journey")
+                .font(.system(size: 42, weight: .bold))
+                .foregroundStyle(ScholarTheme.onSurface)
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+            Text("Tracking progress and celebrating milestones.")
+                .font(.title3)
+                .foregroundStyle(ScholarTheme.onSurfaceVariant)
+        }
+    }
+
+    private var onTrackPill: some View {
+        Label("On Track", systemImage: "seal")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ScholarTheme.primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(ScholarTheme.secondaryContainer.opacity(0.65))
+            .clipShape(Capsule())
+    }
+}
+
+struct InsightsScreen: View {
+    let profiles: [ChildProfile]
+    @Binding var selectedChildID: UUID?
+    let results: [ExamResult]
+    @State private var isGeneratingInsight = false
+
+    private var selectedProfile: ChildProfile? { selectedChild(in: profiles, selectedChildID: selectedChildID) }
+    private var selectedResults: [ExamResult] { resultsForSelectedChild(results, childID: selectedProfile?.profileID) }
+    private var suggestedPathCard: some View {
+        LSCard {
+            VStack(alignment: .leading, spacing: 22) {
+                Label("Suggested Path", systemImage: "sparkles")
+                    .font(.title.bold())
+                    .foregroundStyle(ScholarTheme.primary)
+                Text(recommendationText)
+                    .font(.title3)
+                    .lineSpacing(6)
+                    .foregroundStyle(ScholarTheme.onSurface)
+                Button(action: runInsightAnimation) {
+                    Label("View Suggested Practice", systemImage: "arrow.right")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 24)
+                        .frame(minHeight: 48)
+                        .background(ScholarTheme.primary)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var pacingCard: some View {
+        LSCard {
+            VStack(alignment: .leading, spacing: 26) {
+                Text("Pacing Level")
+                    .font(.title.bold())
+                Text("Optimal challenge zone to prevent frustration.")
+                    .font(.headline)
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                LSPacingLevelView(score: averageScore(selectedResults))
+            }
+        }
+    }
+
+    var body: some View {
+        PremiumScrollView {
+            VStack(alignment: .leading, spacing: 56) {
+                if profiles.isEmpty {
+                    LSEmptyState(icon: "sparkles", title: "No learner selected", message: "Create a child profile to unlock learning insights.")
+                } else if selectedResults.count < 3 {
+                    VStack(alignment: .leading, spacing: 28) {
+                        Text("Monthly Learning Report")
+                            .font(.system(size: 44, weight: .bold))
+                            .foregroundStyle(ScholarTheme.primary)
+                        LSEmptyState(icon: "chart.bar.doc.horizontal", title: "Generate an AI learning report", message: "Generate an AI learning report to discover strengths, areas needing practice, and personalized recommendations.")
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 22) {
+                        Text("Monthly Learning Report")
+                            .font(.system(size: 44, weight: .bold))
+                            .foregroundStyle(ScholarTheme.primary)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.72)
+                        Text("Generated for \(selectedProfile?.name ?? "Learner") • \(DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none))")
+                            .font(.title3)
+                            .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                    }
+
+                    VStack(alignment: .leading, spacing: 24) {
+                        Text(reportSummary)
+                            .font(.title3)
+                            .lineSpacing(8)
+                            .foregroundStyle(ScholarTheme.onSurface)
+                            .frame(maxWidth: 760, alignment: .leading)
+                        Text(reportFocus)
+                            .font(.title3)
+                            .lineSpacing(8)
+                            .foregroundStyle(ScholarTheme.onSurface)
+                            .frame(maxWidth: 760, alignment: .leading)
+                    }
+
+                    LSResponsiveColumns(spacing: 24, leadingMinWidth: 360, trailingMinWidth: 360) {
+                        InsightEditorialCard(title: "Key Strengths", icon: "arrow.up.right", tint: ScholarTheme.primary, items: strengthItems)
+                    } trailing: {
+                        InsightEditorialCard(title: "Areas of Focus", icon: "brain.head.profile", tint: ScholarTheme.tertiary, items: focusItems)
+                    }
+
+                    LSResponsiveColumns(spacing: 24, leadingMinWidth: 520, trailingMinWidth: 280) {
+                        suggestedPathCard
+                    } trailing: {
+                        pacingCard
+                    }
+
+                    Divider().opacity(0.5)
+
+                    if isGeneratingInsight {
+                        LSSkeletonLoadingCard(title: "Refreshing insight", message: "Reviewing recent practice and preparing guidance...")
+                    } else {
+                        HStack(spacing: 16) {
+                            LSSecondaryButton(title: "Refresh Insight", icon: "arrow.clockwise", action: runInsightAnimation)
+                            LSSecondaryButton(title: "Download PDF Report", icon: "arrow.down.doc", action: runInsightAnimation)
+                        }
+                        .frame(maxWidth: 520)
+                    }
+                }
+            }
+        }
+    }
+
+    private func runInsightAnimation() {
+        withAnimation(.easeInOut(duration: 0.2)) { isGeneratingInsight = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            withAnimation(.easeInOut(duration: 0.2)) { isGeneratingInsight = false }
+        }
+    }
+
+    private var reportSummary: String {
+        "\(selectedProfile?.name ?? "Your child") has shown steady engagement across recent practice, with an average score of \(averageScore(selectedResults))% across \(selectedResults.count) completed sessions."
+    }
+
+    private var reportFocus: String {
+        "We recommend low-pressure, focused sessions that reinforce the current needs-practice area while continuing to celebrate strong subjects."
+    }
+
+    private var strengthItems: [(String, String)] {
+        let best = subjectSummaries(selectedResults).max(by: { $0.average < $1.average })
+        return [
+            (best?.subject ?? "Pattern Recognition", best.map { "Currently the strongest area at \($0.average)%." } ?? "Strengths will become clearer after more practice."),
+            ("Practice Confidence", "Completed sessions show growing comfort with structured learning.")
+        ]
+    }
+
+    private var focusItems: [(String, String)] {
+        let weakest = subjectSummaries(selectedResults).min(by: { $0.average < $1.average })
+        return [
+            (weakest?.subject ?? "Task Completion", weakest.map { _ in "Spend a little extra time here this week." } ?? "Focus areas will become clearer after more practice."),
+            ("Sustained Practice", "Keep sessions short, calm, and predictable.")
+        ]
+    }
+
+    private var recommendationText: String {
+        averageScore(selectedResults) >= 80
+            ? "We recommend one balanced practice session a day to keep the challenge fresh without increasing pressure."
+            : "We recommend dedicating 15 minutes a day to gentle practice in short, manageable bursts."
+    }
+}
+
+struct ProfileScreen: View {
+    @Environment(\.openURL) private var openURL
+
+    let parentName: String
+    let parentEmail: String
+    let parentCity: String
+    let profiles: [ChildProfile]
+    @Binding var selectedChildID: UUID?
+    let results: [ExamResult]
+    let onSaveProfile: (String, Int, String, String) -> Void
+    let onDeleteProfile: (ChildProfile) -> Void
+    let onUpdateProfile: (ChildProfile, String, Int, String, String) -> Void
+    let onUpgrade: () -> Void
+    let onLogout: () -> Void
+
+    @State private var showingAddProfile = false
+    @State private var showingAppSettings = false
+    @State private var editingProfile: ChildProfile?
+    @State private var deletingProfile: ChildProfile?
+
+    private var canAddChildProfile: Bool { profiles.count < 5 }
+
+    private var planAndChildrenColumn: some View {
+        VStack(spacing: 28) {
+            LSDarkPlanCard(onUpgrade: onUpgrade)
+
+            LSCard {
+                VStack(alignment: .leading, spacing: 24) {
+                    HStack {
+                        Text("Child Profiles")
+                            .font(.title.bold())
+                        Spacer()
+                        Text("\(profiles.count) of 5 Seats Used")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(ScholarTheme.controlSurface)
+                            .clipShape(Capsule())
+                    }
+
+                    if profiles.isEmpty {
+                        LSEmptyState(icon: "person.crop.circle.badge.plus", title: "No child profiles", message: "Add your first learner to begin practice.")
+                    } else {
+                        LSProfileAvatarStrip(
+                            profiles: profiles,
+                            selectedChildID: $selectedChildID,
+                            results: results,
+                            canAdd: canAddChildProfile,
+                            onEdit: { editingProfile = $0 },
+                            onDelete: { deletingProfile = $0 },
+                            onAdd: {
+                                guard canAddChildProfile else { return }
+                                showingAddProfile = true
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+    private var profileMenuColumn: some View {
+        VStack(spacing: 0) {
+            LSProfileMenuRow(icon: "chart.line.uptrend.xyaxis", title: "Plan & Usage", subtitle: "Billing cycle and history", tint: ScholarTheme.primary) {
+                onUpgrade()
+            }
+            Divider().padding(.leading, 86)
+            LSProfileMenuRow(icon: "gearshape", title: "App Settings", subtitle: "Notifications, audio, display", tint: ScholarTheme.onSurfaceVariant) {
+                showingAppSettings = true
+            }
+            Divider().padding(.leading, 86)
+            LSProfileMenuRow(icon: "questionmark.circle", title: "Support & Help", subtitle: "FAQs and contact", tint: ScholarTheme.onSurfaceVariant) {
+                if let supportURL = URL(string: "https://www.tgdevelops.com/support") {
+                    openURL(supportURL)
+                }
+            }
+            Divider().padding(.leading, 86)
+            LSProfileMenuRow(icon: "rectangle.portrait.and.arrow.right", title: "Logout", subtitle: "", tint: ScholarTheme.error, isDestructive: true, action: onLogout)
+        }
+        .background(ScholarTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(ScholarTheme.hairline(), lineWidth: 1)
+        }
+    }
+
+    var body: some View {
+        PremiumScrollView {
+            VStack(alignment: .leading, spacing: 48) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("\(parentName.isEmpty ? "Parent" : parentName)'s Account")
+                        .font(.system(size: 44, weight: .bold))
+                        .foregroundStyle(ScholarTheme.onSurface)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.72)
+                    Text("Manage your family settings and subscription.")
+                        .font(.title3)
+                        .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                }
+
+                LSResponsiveColumns(spacing: 28, leadingMinWidth: 520, trailingMinWidth: 320) {
+                    planAndChildrenColumn
+                } trailing: {
+                    profileMenuColumn
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddProfile) {
+            AddChildProfileSheet { name, age, grade, avatarValue in
+                guard canAddChildProfile else {
+                    showingAddProfile = false
+                    return
+                }
+                onSaveProfile(name, age, grade, avatarValue)
+                showingAddProfile = false
+            }
+        }
+        .sheet(isPresented: $showingAppSettings) {
+            AppSettingsComingSoonView()
+        }
+        .onChange(of: profiles.count) { _, count in
+            if count >= 5 {
+                showingAddProfile = false
+            }
+        }
+        .sheet(item: $editingProfile) { profile in
+            EditKidProfileView(profile: profile, onSave: onUpdateProfile)
+        }
+        .confirmationDialog("Delete child profile?", isPresented: Binding(get: { deletingProfile != nil }, set: { if !$0 { deletingProfile = nil } })) {
+            Button("Delete Profile and History", role: .destructive) {
+                if let deletingProfile {
+                    onDeleteProfile(deletingProfile)
+                    if selectedChildID == deletingProfile.profileID {
+                        selectedChildID = profiles.first { $0.profileID != deletingProfile.profileID }?.profileID
+                    }
+                }
+                deletingProfile = nil
+            }
+            Button("Cancel", role: .cancel) { deletingProfile = nil }
+        }
+    }
+}
+
+struct AddChildProfileSheet: View {
+    let onSave: (String, Int, String, String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var childName = ""
+    @State private var age = 6
+    @State private var grade = "Grade 1"
+    @State private var avatar: KidAvatar = .unicorn
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedPhotoImage: UIImage?
+    @State private var selectedPhotoAvatarValue: String?
+    @State private var isLoadingPhoto = false
+
+    private let grades = ["Nursery", "LKG", "UKG", "Kindergarten", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5"]
+    private var trimmedName: String { childName.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var avatarValue: String { selectedPhotoAvatarValue ?? avatar.rawValue }
+
+    var body: some View {
+        NavigationStack {
+            LSBackground()
+                .overlay {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            PremiumHeader(
+                                eyebrow: "Child Profile",
+                                title: "Add New Learner",
+                                subtitle: "Create a profile and choose a photo or illustrated avatar."
+                            )
+
+                            LSCard {
+                                VStack(alignment: .leading, spacing: 18) {
+                                    profilePhotoPreview
+                                    PhotosPicker(selection: $selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
+                                        Label("Upload Photo from Device", systemImage: "photo.badge.plus")
+                                            .font(.headline.weight(.semibold))
+                                            .foregroundStyle(ScholarTheme.primary)
+                                            .frame(maxWidth: .infinity, minHeight: 52)
+                                            .background(ScholarTheme.primarySoft.opacity(0.34))
+                                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    if selectedPhotoAvatarValue != nil {
+                                        Button {
+                                            selectedPhotoItem = nil
+                                            selectedPhotoImage = nil
+                                            selectedPhotoAvatarValue = nil
+                                        } label: {
+                                            Label("Use Illustrated Avatar Instead", systemImage: "person.crop.circle")
+                                                .font(.subheadline.weight(.semibold))
+                                        }
+                                        .buttonStyle(.plain)
+                                        .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+
+                            LSCard {
+                                VStack(alignment: .leading, spacing: 18) {
+                                    TextField("Child name", text: $childName)
+                                        .textFieldStyle(.plain)
+                                        .font(.title3)
+                                        .padding()
+                                        .background(ScholarTheme.inputSurface)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                                    ViewThatFits(in: .horizontal) {
+                                        HStack(spacing: 14) {
+                                            LSAgeSelector(age: $age)
+                                                .frame(maxWidth: .infinity)
+                                            LSGradeSelector(grade: $grade, grades: grades)
+                                                .frame(maxWidth: .infinity)
+                                        }
+
+                                        VStack(spacing: 14) {
+                                            LSAgeSelector(age: $age)
+                                            LSGradeSelector(grade: $grade, grades: grades)
+                                        }
+                                    }
+
+                                    if selectedPhotoAvatarValue == nil {
+                                        AvatarPicker(selection: $avatar)
+                                    }
+                                }
+                            }
+
+                            LSPrimaryButton(title: "Add Child Profile", icon: "plus.circle.fill") {
+                                onSave(trimmedName, age, grade, avatarValue)
+                            }
+                            .disabled(trimmedName.isEmpty || isLoadingPhoto)
+                        }
+                        .padding(24)
+                        .adaptiveContentWidth(maxWidth: 640)
+                    }
+                }
+                .navigationTitle("Add Learner")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                }
+                .onChange(of: selectedPhotoItem) { _, item in
+                    loadPhoto(from: item)
+                }
+        }
+        .presentationDetents([.large])
+    }
+
+    private var profilePhotoPreview: some View {
+        HStack(spacing: 18) {
+            ZStack {
+                if let selectedPhotoImage {
+                    Image(uiImage: selectedPhotoImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 96, height: 96)
+                        .clipShape(Circle())
+                } else {
+                    AvatarBadge(avatar: avatar, isSelected: false)
+                        .frame(width: 96, height: 96)
+                }
+
+                if isLoadingPhoto {
+                    ProgressView()
+                        .frame(width: 96, height: 96)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(selectedPhotoImage == nil ? "Profile picture" : "Photo selected")
+                    .font(.title3.bold())
+                    .foregroundStyle(ScholarTheme.onSurface)
+                Text("Use a device photo or choose one of the Little Scholar avatars.")
+                    .font(.subheadline)
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func loadPhoto(from item: PhotosPickerItem?) {
+        guard let item else { return }
+        isLoadingPhoto = true
+        Task {
+            defer { isLoadingPhoto = false }
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let encoded = childProfileAvatarValue(from: data),
+                  let image = childProfileImage(from: encoded) else {
+                return
+            }
+            selectedPhotoAvatarValue = encoded
+            selectedPhotoImage = image
+        }
+    }
+}
+
 struct ChildProfileView: View {
     let profiles: [ChildProfile]
-    let onSaveProfile: (String, Int, String, KidAvatar) -> Void
+    let onSaveProfile: (String, Int, String, String) -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var childName = ""
@@ -1091,12 +2061,12 @@ struct ChildProfileView: View {
                 Picker("Grade", selection: $grade) { ForEach(grades, id: \.self) { Text($0).tag($0) } }.pickerStyle(.menu)
                 AvatarPicker(selection: $avatar)
                 Button {
-                    onSaveProfile(childName, age, grade, avatar)
+                    onSaveProfile(childName, age, grade, avatar.rawValue)
                     childName = ""
                 } label: {
                     Label("Add Kid Profile", systemImage: "plus.circle.fill").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(CheerfulButtonStyle(color: .orange))
+                .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                 .disabled(childName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
@@ -1146,7 +2116,7 @@ struct ExamSetupView: View {
     }
 
     private var setupForm: some View {
-        sectionCard(title: "Generate Exam Paper", icon: "doc.badge.plus") {
+        sectionCard(title: "Generate Practice", icon: "doc.badge.plus") {
             if profiles.isEmpty {
                 EmptyStateView(icon: "person.2.slash", title: "Add a kid first", message: "Go to Parent Mode and create a kid profile before making an exam.")
             } else {
@@ -1162,9 +2132,9 @@ struct ExamSetupView: View {
                             guard let selectedProfile else { return }
                             onGenerateExam(selectedProfile, selectedSubject, selectedDifficulty, numberOfQuestions)
                         } label: {
-                            Label("Generate Exam Paper", systemImage: "sparkles").frame(maxWidth: .infinity)
+                            Label("Generate Practice", systemImage: "sparkles").frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(CheerfulButtonStyle(color: .teal))
+                        .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                     }
                 }
             }
@@ -1192,9 +2162,9 @@ struct ExamGeneratingView: View {
     var body: some View {
         VStack(spacing: 14) {
             HStack(spacing: 18) {
-                animatedIcon("pencil.and.scribble", color: .orange, delay: 0)
-                animatedIcon("sparkles", color: .purple, delay: 0.12)
-                animatedIcon("brain.head.profile", color: .teal, delay: 0.24)
+                animatedIcon("pencil.and.scribble", color: ScholarTheme.primary, delay: 0)
+                animatedIcon("sparkles", color: ScholarTheme.lavender, delay: 0.12)
+                animatedIcon("brain.head.profile", color: ScholarTheme.sky, delay: 0.24)
             }
             .padding(.top, 4)
 
@@ -1208,12 +2178,12 @@ struct ExamGeneratingView: View {
                 .multilineTextAlignment(.center)
 
             ProgressView(value: sparkle ? 0.86 : 0.28)
-                .tint(.orange)
+                .tint(ScholarTheme.primary)
                 .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: sparkle)
         }
         .frame(maxWidth: .infinity)
         .padding(18)
-        .background(Color.yellow.opacity(0.16))
+        .background(ScholarTheme.primarySoft.opacity(0.18))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onAppear {
             bounce = true
@@ -1237,7 +2207,7 @@ struct ExamGeneratingView: View {
 struct ExamPreviewView: View {
     let exams: [Exam]
     var body: some View {
-        sectionCard(title: "Pending Exam Papers", icon: "tray.full.fill") {
+        sectionCard(title: "Pending Practice", icon: "tray.full.fill") {
             if exams.isEmpty {
                 EmptyStateView(icon: "tray", title: "No pending papers", message: "Generated exams will wait here until the kid completes them.")
             } else {
@@ -1254,7 +2224,7 @@ struct KidExamListView: View {
     let onSubmit: (Exam, [UUID: String]) -> ExamResult?
     let onCreateExam: () -> Void
     let onDeleteProfile: (ChildProfile) -> Void
-    let onUpdateProfile: (ChildProfile, String, Int, String, KidAvatar) -> Void
+    let onUpdateProfile: (ChildProfile, String, Int, String, String) -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedProfileID: PersistentIdentifier?
@@ -1338,9 +2308,9 @@ struct KidExamListView: View {
                                 } label: {
                                     Image(systemName: "pencil.circle.fill")
                                         .font(.title2)
-                                        .foregroundStyle(.teal)
+                                        .foregroundStyle(ScholarTheme.sky)
                                         .frame(width: 36, height: 36)
-                                        .background(Color.teal.opacity(0.12))
+                                        .background(ScholarTheme.sky.opacity(0.12))
                                         .clipShape(Circle())
                                 }
                                 .buttonStyle(.plain)
@@ -1352,9 +2322,9 @@ struct KidExamListView: View {
                                 } label: {
                                     Image(systemName: "trash.circle.fill")
                                         .font(.title2)
-                                        .foregroundStyle(.red)
+                                        .foregroundStyle(ScholarTheme.coral)
                                         .frame(width: 36, height: 36)
-                                        .background(Color.red.opacity(0.12))
+                                        .background(ScholarTheme.coral.opacity(0.12))
                                         .clipShape(Circle())
                                 }
                                 .buttonStyle(.plain)
@@ -1367,7 +2337,7 @@ struct KidExamListView: View {
                                 completedResult = nil
                             } label: {
                                 VStack(spacing: 8) {
-                                    AvatarBadge(avatar: KidAvatar.avatar(for: profile.avatar), isSelected: isSelected)
+                                    ChildProfilePhotoBadge(avatarValue: profile.avatar, isSelected: isSelected)
                                     Text(profile.name).font(.title3.bold()).foregroundStyle(.primary).lineLimit(1)
                                     Text(profile.grade).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                                 }
@@ -1376,7 +2346,7 @@ struct KidExamListView: View {
                             .buttonStyle(.plain)
                         }
                         .padding(12)
-                        .background(isSelected ? Color.green.opacity(0.24) : ScholarTheme.controlSurface)
+                        .background(isSelected ? ScholarTheme.mint.opacity(0.22) : ScholarTheme.controlSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                 }
@@ -1385,13 +2355,13 @@ struct KidExamListView: View {
     }
 
     private var assignedExams: some View {
-        sectionCard(title: "Your Exam Papers", icon: "doc.text.fill") {
+        sectionCard(title: "Your Practice", icon: "doc.text.fill") {
             if selectedProfile == nil {
-                EmptyStateView(icon: "hand.tap.fill", title: "Tap your profile", message: "Then your exam papers will appear here.")
+                EmptyStateView(icon: "hand.tap.fill", title: "Tap your profile", message: "Then your practice will appear here.")
             } else if examsForSelectedProfile.isEmpty {
                 VStack(spacing: 14) {
-                    EmptyStateView(icon: "doc.badge.clock", title: "No exam assigned", message: "Ask a parent to generate an exam paper for you.")
-                    Button(action: onCreateExam) { Label("Go to Exam Mode", systemImage: "doc.badge.plus").frame(maxWidth: .infinity) }.buttonStyle(CheerfulButtonStyle(color: .teal))
+                    EmptyStateView(icon: "doc.badge.clock", title: "No practice assigned", message: "Ask a parent to generate practice for you.")
+                    Button(action: onCreateExam) { Label("Go to Practice", systemImage: "doc.badge.plus").frame(maxWidth: .infinity) }.buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                 }
             } else {
                 LazyVStack(spacing: 12) { ForEach(examsForSelectedProfile) { exam in Button { selectedExam = exam } label: { ExamStartRow(exam: exam) }.buttonStyle(.plain) } }
@@ -1424,7 +2394,7 @@ struct KidExamListView: View {
 
 struct EditKidProfileView: View {
     let profile: ChildProfile
-    let onSave: (ChildProfile, String, Int, String, KidAvatar) -> Void
+    let onSave: (ChildProfile, String, Int, String, String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
@@ -1438,7 +2408,7 @@ struct EditKidProfileView: View {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    init(profile: ChildProfile, onSave: @escaping (ChildProfile, String, Int, String, KidAvatar) -> Void) {
+    init(profile: ChildProfile, onSave: @escaping (ChildProfile, String, Int, String, String) -> Void) {
         self.profile = profile
         self.onSave = onSave
         _name = State(initialValue: profile.name)
@@ -1477,7 +2447,7 @@ struct EditKidProfileView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        onSave(profile, name, age, grade, avatar)
+                        onSave(profile, name, age, grade, avatar.rawValue)
                         dismiss()
                     }
                     .disabled(!canSave)
@@ -1511,14 +2481,14 @@ struct ExamAttemptView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                Text("\(exam.childName)'s \(exam.subject) Exam")
+                Text("\(exam.childName)'s \(exam.subject) Practice")
                     .font(.title2.bold())
                     .multilineTextAlignment(.center)
                 Text("Question \(currentIndex + 1) of \(exam.questions.count)")
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 ProgressView(value: Double(currentIndex + 1), total: Double(exam.questions.count))
-                    .tint(.orange)
+                    .tint(ScholarTheme.primary)
 
                 VStack(alignment: .leading, spacing: 18) {
                     Text(currentQuestion.prompt)
@@ -1541,7 +2511,7 @@ struct ExamAttemptView: View {
                                         .multilineTextAlignment(.leading)
                                 }
                                 .padding()
-                                .background(answers[currentQuestion.id] == option ? Color.green.opacity(0.24) : ScholarTheme.controlSurface)
+                                .background(answers[currentQuestion.id] == option ? ScholarTheme.mint.opacity(0.22) : ScholarTheme.controlSurface)
                                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                             }
                             .buttonStyle(.plain)
@@ -1563,7 +2533,7 @@ struct ExamAttemptView: View {
                     Button { currentIndex == exam.questions.count - 1 ? onSubmit(exam, answers) : (currentIndex += 1) } label: {
                         Label(currentIndex == exam.questions.count - 1 ? "Submit" : "Next", systemImage: "arrow.right.circle.fill").frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(CheerfulButtonStyle(color: .orange))
+                    .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                     .disabled(!currentAnswerIsReady)
                 }
             }
@@ -1605,7 +2575,7 @@ struct PerformanceDashboardView: View {
     }
 
     private var dashboardCard: some View {
-        sectionCard(title: "Performance Dashboard", icon: "chart.bar.fill") {
+                sectionCard(title: "Progress", icon: "chart.bar.fill") {
             if profiles.isEmpty {
                 EmptyStateView(icon: "person.2.slash", title: "No kids yet", message: "Create kid profiles to view performance history.")
             } else {
@@ -1626,9 +2596,9 @@ struct ExamHistoryView: View {
     let results: [ExamResult]
 
     var body: some View {
-        sectionCard(title: "Exam History", icon: "clock.fill") {
+        sectionCard(title: "Practice History", icon: "clock.fill") {
             if results.isEmpty {
-                EmptyStateView(icon: "clock.badge.questionmark", title: "No completed exams", message: "Completed exam results will appear here.")
+                EmptyStateView(icon: "clock.badge.questionmark", title: "No completed practice", message: "Completed practice results will appear here.")
             } else {
                 LazyVStack(spacing: 14) {
                     ForEach(results) { result in
@@ -1648,10 +2618,10 @@ struct ResultView: View {
         ScrollView {
             VStack(spacing: 16) {
                 VStack(spacing: 12) {
-                    Image(systemName: result.percentage >= 70 ? "star.circle.fill" : "heart.circle.fill").font(.system(size: 64)).foregroundStyle(result.percentage >= 70 ? .yellow : .pink)
+                    Image(systemName: result.percentage >= 70 ? "star.circle.fill" : "heart.circle.fill").font(.system(size: 64)).foregroundStyle(result.percentage >= 70 ? ScholarTheme.honey : ScholarTheme.coral)
                     Text("Great try, \(result.childName)!").font(.title.bold()).multilineTextAlignment(.center)
                     Text("Score: \(result.correctAnswers)/\(result.totalQuestions)").font(.largeTitle.bold())
-                    Text("\(result.percentage)% • \(result.reportGrade)").font(.title2.bold()).foregroundStyle(.teal)
+                    Text("\(result.percentage)% • \(result.reportGrade)").font(.title2.bold()).foregroundStyle(ScholarTheme.sky)
                     Text(result.feedback).font(.title3.weight(.medium)).multilineTextAlignment(.center).foregroundStyle(.secondary)
                 }
                 .padding(24)
@@ -1665,7 +2635,7 @@ struct ResultView: View {
             .frame(maxWidth: .infinity)
         }
         .background(LittleScholarBackground())
-        .navigationTitle("Exam Result")
+        .navigationTitle("Practice Result")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -1676,9 +2646,9 @@ struct QuestionReviewList: View {
         VStack(spacing: 12) {
             ForEach(evaluations) { item in
                 VStack(alignment: .leading, spacing: 8) {
-                    Label(item.isCorrect ? "Correct" : "Needs Practice", systemImage: item.isCorrect ? "checkmark.seal.fill" : "xmark.seal.fill").font(.headline).foregroundStyle(item.isCorrect ? .green : .red)
+                    Label(item.isCorrect ? "Correct" : "Needs Practice", systemImage: item.isCorrect ? "checkmark.seal.fill" : "xmark.seal.fill").font(.headline).foregroundStyle(item.isCorrect ? ScholarTheme.mint : ScholarTheme.coral)
                     Text(item.question.prompt).font(.headline)
-                    Text("Your answer: \(item.selectedAnswer)").foregroundStyle(item.isCorrect ? .green : .red)
+                    Text("Your answer: \(item.selectedAnswer)").foregroundStyle(item.isCorrect ? ScholarTheme.mint : ScholarTheme.coral)
                     if !item.isCorrect { Text("Correct answer: \(item.question.correctAnswer)") }
                     Text(item.question.explanation).font(.subheadline).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading).padding().background(ScholarTheme.surface).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -1696,7 +2666,7 @@ struct HeaderView: View {
             HStack(spacing: 12) {
                 Image(systemName: "graduationcap.circle.fill")
                     .font(.system(size: 50))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ScholarTheme.primary)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Little Scholar")
@@ -1715,13 +2685,13 @@ struct HeaderView: View {
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.orange)
+                .foregroundStyle(ScholarTheme.primary)
                 .background(ScholarTheme.controlSurface)
                 .clipShape(Circle())
                 .accessibilityLabel("Logout")
             }
 
-            Text("Parent setup, exam papers, kid attempts, and history")
+            Text("Parent setup, practice, child attempts, and progress")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -1744,7 +2714,7 @@ struct ModeNavigation: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 62)
                     .foregroundStyle(selectedMode == mode ? Color.white : Color.primary)
-                    .background(selectedMode == mode ? Color.orange : ScholarTheme.controlSurface)
+                    .background(selectedMode == mode ? ScholarTheme.primary : ScholarTheme.controlSurface)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .shadow(color: ScholarTheme.shadow.opacity(selectedMode == mode ? 1 : 0.45), radius: 8, y: 4)
                 }.buttonStyle(.plain)
@@ -1761,7 +2731,7 @@ struct EmptyStateView: View {
     let title: String
     let message: String
     var body: some View {
-        VStack(spacing: 10) { Image(systemName: icon).font(.system(size: 42)).foregroundStyle(.orange); Text(title).font(.title3.bold()).multilineTextAlignment(.center); Text(message).font(.subheadline.weight(.medium)).foregroundStyle(.secondary).multilineTextAlignment(.center) }.frame(maxWidth: .infinity).padding(.vertical, 18)
+        VStack(spacing: 10) { Image(systemName: icon).font(.system(size: 42)).foregroundStyle(ScholarTheme.primary); Text(title).font(.title3.bold()).multilineTextAlignment(.center); Text(message).font(.subheadline.weight(.medium)).foregroundStyle(.secondary).multilineTextAlignment(.center) }.frame(maxWidth: .infinity).padding(.vertical, 18)
     }
 }
 
@@ -1813,11 +2783,45 @@ struct AvatarBadge: View {
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title3)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ScholarTheme.mint)
                     .background(ScholarTheme.controlSurface.clipShape(Circle()))
             }
         }
         .accessibilityLabel(avatar.rawValue)
+    }
+}
+
+struct ChildProfilePhotoBadge: View {
+    let avatarValue: String
+    var isSelected = false
+    var size: CGFloat = 56
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Group {
+                if let image = childProfileImage(from: avatarValue) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    let avatar = KidAvatar.avatar(for: avatarValue)
+                    Image(systemName: avatar.icon)
+                        .font(.system(size: size * 0.54, weight: .bold))
+                        .foregroundStyle(avatar.color)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(avatar.color.opacity(0.16))
+                }
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(size > 60 ? .title2 : .title3)
+                    .foregroundStyle(ScholarTheme.mint)
+                    .background(ScholarTheme.controlSurface.clipShape(Circle()))
+            }
+        }
     }
 }
 
@@ -1835,28 +2839,28 @@ struct ProfileRow: View {
 
 struct ExamPreviewRow: View {
     let exam: Exam
-    var body: some View { row(icon: "doc.text.fill", title: "\(exam.childName) • \(exam.subject)", subtitle: "\(exam.difficulty) • \(exam.questions.count) questions", color: .teal) }
+    var body: some View { row(icon: "doc.text.fill", title: "\(exam.childName) • \(exam.subject)", subtitle: "\(exam.difficulty) • \(exam.questions.count) questions", color: ScholarTheme.sky) }
 }
 
 struct ExamStartRow: View {
     let exam: Exam
-    var body: some View { row(icon: "book.fill", title: exam.subject, subtitle: "\(exam.difficulty) • \(exam.questions.count) questions • Start Exam", color: .teal) }
+    var body: some View { row(icon: "book.fill", title: exam.subject, subtitle: "\(exam.difficulty) • \(exam.questions.count) questions • Start Practice", color: ScholarTheme.sky) }
 }
 
 struct ResultHistoryRow: View {
     let result: ExamResult
-    var body: some View { row(icon: "chart.bar.fill", title: "\(result.childName) • \(result.percentage)%", subtitle: "\(result.subject) • \(result.correctAnswers) correct, \(result.totalQuestions - result.correctAnswers) wrong", color: .orange) }
+    var body: some View { row(icon: "chart.bar.fill", title: "\(result.childName) • \(result.percentage)%", subtitle: "\(result.subject) • \(result.correctAnswers) correct, \(result.totalQuestions - result.correctAnswers) wrong", color: ScholarTheme.primary) }
 }
 
 struct LatestResultBanner: View {
     let result: ExamResult
-    var body: some View { NavigationLink { ResultView(result: result) } label: { row(icon: "star.circle.fill", title: "Latest Result", subtitle: "\(result.subject): \(result.percentage)% • \(result.reportGrade)", color: .yellow) }.buttonStyle(.plain).padding(.horizontal) }
+    var body: some View { NavigationLink { ResultView(result: result) } label: { row(icon: "star.circle.fill", title: "Latest Result", subtitle: "\(result.subject): \(result.percentage)% • \(result.reportGrade)", color: ScholarTheme.honey) }.buttonStyle(.plain).padding(.horizontal) }
 }
 
 struct HistorySummary: View {
     let results: [ExamResult]
     private var average: Int { results.isEmpty ? 0 : Int((Double(results.map(\.percentage).reduce(0, +)) / Double(results.count)).rounded()) }
-    var body: some View { HStack(spacing: 12) { SummaryTile(title: "Exams", value: "\(results.count)", color: .orange); SummaryTile(title: "Average", value: "\(average)%", color: .teal); SummaryTile(title: "Best", value: "\(results.map(\.percentage).max() ?? 0)%", color: .pink) } }
+    var body: some View { HStack(spacing: 12) { SummaryTile(title: "Practice", value: "\(results.count)", color: ScholarTheme.primary); SummaryTile(title: "Average", value: "\(average)%", color: ScholarTheme.sky); SummaryTile(title: "Best", value: "\(results.map(\.percentage).max() ?? 0)%", color: ScholarTheme.honey) } }
 }
 
 struct SummaryTile: View {
@@ -1895,27 +2899,8 @@ struct CheerfulButtonStyle: ButtonStyle {
 }
 
 struct LittleScholarBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var gradientColors: [Color] {
-        if colorScheme == .dark {
-            return [
-                Color.indigo.opacity(0.30),
-                Color.teal.opacity(0.18),
-                Color.purple.opacity(0.24)
-            ]
-        }
-        return [
-            Color.yellow.opacity(0.28),
-            Color.cyan.opacity(0.22),
-            Color.pink.opacity(0.18)
-        ]
-    }
-
     var body: some View {
-        LinearGradient(colors: gradientColors, startPoint: .topLeading, endPoint: .bottomTrailing)
-            .background(Color(uiColor: .systemGroupedBackground))
-            .ignoresSafeArea()
+        LSBackground()
     }
 }
 
@@ -1953,6 +2938,1619 @@ func row(icon: String, title: String, subtitle: String, color: Color) -> some Vi
     .padding()
     .background(ScholarTheme.controlSurface)
     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+}
+
+struct PremiumScrollView<Content: View>: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        ScrollView {
+            content()
+                .padding(.horizontal, horizontalSizeClass == .compact ? 20 : 48)
+                .padding(.top, horizontalSizeClass == .compact ? 26 : 44)
+                .padding(.bottom, 132)
+                .adaptiveContentWidth(maxWidth: 1100)
+        }
+        .background(LSBackground())
+    }
+}
+
+struct LSTopAppBar: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    let parentName: String
+    private var isCompact: Bool { horizontalSizeClass == .compact }
+
+    var body: some View {
+        HStack(spacing: isCompact ? 12 : 28) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Little Scholar")
+                    .font(.system(size: isCompact ? 26 : 34, weight: .bold))
+                    .foregroundStyle(ScholarTheme.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                if isCompact {
+                    Text("Exam Buddy")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                }
+            }
+
+            Spacer(minLength: 18)
+
+            if !isCompact {
+                Text(greeting)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(ScholarTheme.onSurface)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(ScholarTheme.primary)
+                .frame(width: 44, height: 44)
+                .background(ScholarTheme.controlSurface)
+                .clipShape(Circle())
+        }
+        .padding(.horizontal, isCompact ? 20 : 48)
+        .frame(maxWidth: 1100, minHeight: 80)
+        .frame(maxWidth: .infinity)
+        .background(ScholarTheme.surface.opacity(0.92))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: .now)
+        let name = parentName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = name.isEmpty ? "" : ", \(name)"
+        switch hour {
+        case 5..<12: return "Good Morning\(displayName)"
+        case 12..<17: return "Good Afternoon\(displayName)"
+        case 17..<22: return "Good Evening\(displayName)"
+        default: return name.isEmpty ? "Welcome back" : "Welcome back, \(name)"
+        }
+    }
+}
+
+struct LSTonalPanel<Content: View>: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(horizontalSizeClass == .compact ? 24 : 48)
+            .background(ScholarTheme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+}
+
+struct LSResponsiveColumns<Leading: View, Trailing: View>: View {
+    let spacing: CGFloat
+    let leadingMinWidth: CGFloat
+    let trailingMinWidth: CGFloat
+    @ViewBuilder var leading: () -> Leading
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: spacing) {
+                leading()
+                    .frame(minWidth: leadingMinWidth, maxWidth: .infinity, alignment: .topLeading)
+                trailing()
+                    .frame(minWidth: trailingMinWidth, maxWidth: .infinity, alignment: .topLeading)
+            }
+
+            VStack(alignment: .leading, spacing: spacing) {
+                leading()
+                trailing()
+            }
+        }
+    }
+}
+
+struct LSActionHeader: View {
+    let title: String
+    let buttonTitle: String
+    let buttonIcon: String
+    let action: () -> Void
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center) {
+                titleText
+                Spacer(minLength: 24)
+                actionButton
+            }
+
+            VStack(alignment: .leading, spacing: 20) {
+                titleText
+                actionButton
+            }
+        }
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(.system(size: 44, weight: .bold))
+            .foregroundStyle(ScholarTheme.onSurface)
+            .minimumScaleFactor(0.72)
+            .lineLimit(2)
+    }
+
+    private var actionButton: some View {
+        Button(action: action) {
+            Label(buttonTitle, systemImage: buttonIcon)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 30)
+                .frame(minHeight: 58)
+                .background(ScholarTheme.primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct PremiumHeader: View {
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !eyebrow.isEmpty {
+                Text(eyebrow)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ScholarTheme.primary)
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+            }
+            Text(title)
+                .font(.largeTitle.bold())
+                .foregroundStyle(ScholarTheme.primaryText)
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+            if !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.headline)
+                    .foregroundStyle(ScholarTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct LSBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ScholarTheme.background
+            .overlay(alignment: .topLeading) {
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [ScholarTheme.primary.opacity(0.16), Color.clear]
+                        : [Color.white.opacity(0.68), ScholarTheme.primarySoft.opacity(0.18), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+            }
+            .ignoresSafeArea()
+    }
+}
+
+struct LSCard<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(26)
+            .background(ScholarTheme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(ScholarTheme.hairline(0.9), lineWidth: 1)
+            }
+            .shadow(color: ScholarTheme.shadow, radius: 16, x: 0, y: 8)
+    }
+}
+
+struct LSHeroCard<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(30)
+            .background(ScholarTheme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .stroke(ScholarTheme.primary.opacity(0.08), lineWidth: 1)
+            }
+            .shadow(color: ScholarTheme.shadow, radius: 18, x: 0, y: 10)
+    }
+}
+
+struct LSSectionHeader: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(ScholarTheme.primary)
+                .frame(width: 36, height: 36)
+                .background(ScholarTheme.primary.opacity(0.09))
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.title2.bold())
+                Text(subtitle)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ScholarTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct LSStatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: icon)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(color)
+                .frame(width: 34, height: 34)
+                .background(color.opacity(0.09))
+                .clipShape(Circle())
+            Text(value)
+                .font(.title.bold())
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(title)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ScholarTheme.secondaryText)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, minHeight: 116, alignment: .leading)
+        .padding(18)
+        .background(ScholarTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(ScholarTheme.hairline(), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct LSMetricTile: View {
+    let title: String
+    let value: String
+    let detail: String
+    let icon: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+                .foregroundStyle(ScholarTheme.onSurface)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .lastTextBaseline, spacing: 10) {
+                    metricValue
+                    detailText
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    metricValue
+                    detailText
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 138, alignment: .leading)
+        .padding(24)
+        .background(ScholarTheme.cardBackground.opacity(0.88))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(ScholarTheme.hairline(0.9), lineWidth: 1)
+        }
+        .shadow(color: ScholarTheme.shadow, radius: 12, y: 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var metricValue: some View {
+        Text(value)
+            .font(.system(size: 36, weight: .bold))
+            .foregroundStyle(ScholarTheme.onSurface)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+    }
+
+    private var detailText: some View {
+        Text(detail)
+            .font(.subheadline)
+            .foregroundStyle(ScholarTheme.onSurfaceVariant)
+            .lineLimit(2)
+    }
+}
+
+struct LSQuestionCountButton: View {
+    let count: Int
+    @Binding var selectedCount: Int
+
+    var body: some View {
+        Button {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                selectedCount = count
+            }
+        } label: {
+            Text("\(count) Qs")
+                .font(.title3.weight(.medium))
+                .foregroundStyle(selectedCount == count ? Color.white : ScholarTheme.onSurfaceVariant)
+                .frame(maxWidth: .infinity, minHeight: 62)
+                .background(selectedCount == count ? ScholarTheme.primary : ScholarTheme.inputSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(count) questions")
+        .accessibilityValue(selectedCount == count ? "Selected" : "")
+    }
+}
+
+struct LSAgeSelector: View {
+    @Binding var age: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Age", systemImage: "birthday.cake")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                .textCase(.uppercase)
+                .tracking(1.4)
+
+            HStack(spacing: 12) {
+                ageButton(icon: "minus") {
+                    age = max(3, age - 1)
+                }
+
+                VStack(spacing: 1) {
+                    Text("\(age)")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(ScholarTheme.onSurface)
+                        .monospacedDigit()
+                    Text("years")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                }
+                .frame(maxWidth: .infinity, minHeight: 48)
+
+                ageButton(icon: "plus") {
+                    age = min(12, age + 1)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 118, alignment: .leading)
+        .background(ScholarTheme.inputSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(ScholarTheme.hairline(), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Age")
+        .accessibilityValue("\(age) years")
+    }
+
+    private func ageButton(icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(ScholarTheme.primary)
+                .frame(width: 38, height: 38)
+                .background(ScholarTheme.cardBackground)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(icon == "minus" ? age <= 3 : age >= 12)
+        .opacity((icon == "minus" ? age <= 3 : age >= 12) ? 0.42 : 1)
+    }
+}
+
+struct LSGradeSelector: View {
+    @Binding var grade: String
+    let grades: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Grade", systemImage: "graduationcap")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                .textCase(.uppercase)
+                .tracking(1.4)
+
+            Menu {
+                ForEach(grades, id: \.self) { gradeOption in
+                    Button {
+                        grade = gradeOption
+                    } label: {
+                        Label(gradeOption, systemImage: grade == gradeOption ? "checkmark" : "")
+                    }
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Text(grade)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(ScholarTheme.onSurface)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ScholarTheme.primary)
+                        .frame(width: 34, height: 34)
+                        .background(ScholarTheme.cardBackground)
+                        .clipShape(Circle())
+                }
+                .frame(minHeight: 48)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 118, alignment: .leading)
+        .background(ScholarTheme.inputSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(ScholarTheme.hairline(), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Grade")
+        .accessibilityValue(grade)
+    }
+}
+
+struct LSInitialAvatar: View {
+    let profile: ChildProfile?
+
+    var body: some View {
+        Text(initial)
+            .font(.system(size: 30, weight: .semibold))
+            .foregroundStyle(ScholarTheme.primary)
+            .frame(width: 66, height: 66)
+            .background(ScholarTheme.secondaryContainer)
+            .clipShape(Circle())
+            .overlay {
+                Circle().stroke(ScholarTheme.primary, lineWidth: 2)
+            }
+    }
+
+    private var initial: String {
+        guard let first = profile?.name.first else { return "L" }
+        return String(first).uppercased()
+    }
+}
+
+struct LSPrimaryButton: View {
+    let title: String
+    let icon: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.headline.bold())
+                .frame(maxWidth: .infinity, minHeight: 54)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .background(ScholarTheme.darkOlive)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: ScholarTheme.primary.opacity(0.18), radius: 12, y: 7)
+    }
+}
+
+struct LSSecondaryButton: View {
+    let title: String
+    let icon: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.headline.bold())
+                .frame(maxWidth: .infinity, minHeight: 52)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(ScholarTheme.primary)
+        .background(ScholarTheme.primary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+struct LSBottomTabBar: View {
+    @Binding var selectedMode: AppMode
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(AppMode.allCases) { mode in
+                Button {
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+                        selectedMode = mode
+                    }
+                } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: mode.icon)
+                            .font(.headline.weight(.bold))
+                        Text(mode.rawValue)
+                            .font(.caption2.bold())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        Capsule()
+                            .fill(selectedMode == mode ? ScholarTheme.primary : Color.clear)
+                            .frame(width: 18, height: 3)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 62)
+                    .foregroundStyle(selectedMode == mode ? ScholarTheme.primary : ScholarTheme.secondaryText)
+                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(mode.rawValue)
+                .accessibilityValue(selectedMode == mode ? "Selected" : "")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(ScholarTheme.hairline(1.4), lineWidth: 1)
+        }
+        .shadow(color: ScholarTheme.shadow, radius: 16, y: 8)
+        .frame(maxWidth: 760)
+    }
+}
+
+struct LSEmptyState: View {
+    let icon: String
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 42, weight: .semibold))
+                .foregroundStyle(ScholarTheme.primary)
+                .frame(width: 76, height: 76)
+                .background(ScholarTheme.primary.opacity(0.08))
+                .clipShape(Circle())
+            Text(title)
+                .font(.title2.bold())
+                .multilineTextAlignment(.center)
+            Text(message)
+                .font(.headline)
+                .foregroundStyle(ScholarTheme.secondaryText)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(26)
+        .background(ScholarTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct LSSkeletonLoadingCard: View {
+    let title: String
+    let message: String
+    @State private var pulse = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label(title, systemImage: "sparkles")
+                .font(.title3.bold())
+                .foregroundStyle(ScholarTheme.primary)
+            Text(message)
+                .font(.headline)
+                .foregroundStyle(ScholarTheme.secondaryText)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(ScholarTheme.primarySoft.opacity(pulse ? 0.46 : 0.18))
+                .frame(height: 12)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(ScholarTheme.primary.opacity(pulse ? 0.16 : 0.06))
+                .frame(width: 180, height: 12)
+        }
+        .padding(18)
+        .background(ScholarTheme.controlSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onAppear { pulse = true }
+        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct LSChildCarousel: View {
+    let profiles: [ChildProfile]
+    @Binding var selectedChildID: UUID?
+    let results: [ExamResult]
+    var includesAddLearner = false
+    var onAddLearner: (() -> Void)?
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 34) {
+                ForEach(profiles) { profile in
+                    LSLearnerBubble(
+                        profile: profile,
+                        isSelected: selectedChildID == profile.profileID
+                    ) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                            selectedChildID = profile.profileID
+                        }
+                    }
+                }
+                if includesAddLearner {
+                    Button {
+                        onAddLearner?()
+                    } label: {
+                        VStack(spacing: 12) {
+                            Image(systemName: "plus")
+                                .font(.title2.weight(.medium))
+                                .foregroundStyle(ScholarTheme.primary)
+                                .frame(width: 64, height: 64)
+                                .background(ScholarTheme.controlSurface)
+                                .clipShape(Circle())
+                                .overlay {
+                                    Circle()
+                                        .stroke(ScholarTheme.outlineVariant, style: StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
+                                }
+                            Text("Add Learner")
+                                .font(.headline)
+                                .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                        }
+                        .frame(width: 112)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add learner")
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+}
+
+struct LSLearnerBubble: View {
+    let profile: ChildProfile
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                ChildProfilePhotoBadge(avatarValue: profile.avatar, isSelected: isSelected, size: 68)
+                VStack(spacing: 4) {
+                    Text(profile.name)
+                        .font(.headline)
+                        .foregroundStyle(ScholarTheme.onSurface)
+                        .lineLimit(1)
+                    Text("\(profile.grade) • Age \(profile.age)")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+            }
+            .frame(width: 120)
+            .opacity(isSelected ? 1 : 0.58)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(profile.name), \(profile.grade), age \(profile.age)")
+        .accessibilityValue(isSelected ? "Selected" : "")
+    }
+}
+
+struct LSChildProfileCard: View {
+    let profile: ChildProfile
+    let averageScore: Int
+    let isSelected: Bool
+    var showsAverageScore: Bool = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    ChildProfilePhotoBadge(avatarValue: profile.avatar, isSelected: isSelected)
+                    Spacer()
+                    if showsAverageScore {
+                        Text(averageScore == 0 ? "New" : "\(averageScore)%")
+                            .font(.headline.bold())
+                            .foregroundStyle(ScholarTheme.primary)
+                    }
+                }
+                Text(profile.name)
+                    .font(.title3.bold())
+                    .foregroundStyle(ScholarTheme.primaryText)
+                    .lineLimit(1)
+                Text("\(profile.grade) • Age \(profile.age)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ScholarTheme.secondaryText)
+            }
+            .frame(maxWidth: .infinity, minHeight: 150, alignment: .leading)
+            .padding(18)
+            .background(isSelected ? ScholarTheme.primarySoft.opacity(0.35) : ScholarTheme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(isSelected ? ScholarTheme.primary.opacity(0.72) : ScholarTheme.hairline(), lineWidth: isSelected ? 1.5 : 1)
+            }
+            .shadow(color: ScholarTheme.shadow.opacity(isSelected ? 1.2 : 0.65), radius: isSelected ? 16 : 10, y: isSelected ? 8 : 5)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(profile.name), \(profile.grade), age \(profile.age)")
+        .accessibilityValue(isSelected ? "Selected" : "")
+    }
+}
+
+struct AIRecommendationCard: View {
+    let results: [ExamResult]
+    let onViewInsights: () -> Void
+
+    var body: some View {
+        LSCard {
+            ZStack(alignment: .trailing) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 110, weight: .light))
+                    .foregroundStyle(ScholarTheme.surfaceVariant.opacity(0.75))
+                    .padding(.trailing, 12)
+                VStack(alignment: .leading, spacing: 20) {
+                    Label("AI Insight", systemImage: "sparkles")
+                        .font(.caption.weight(.semibold))
+                        .textCase(.uppercase)
+                        .tracking(2)
+                        .foregroundStyle(ScholarTheme.primary)
+                    Text(recommendation)
+                        .font(.title3)
+                        .lineSpacing(4)
+                        .foregroundStyle(ScholarTheme.onSurface)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(action: onViewInsights) {
+                        Label("View Full Insights", systemImage: "arrow.right")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(ScholarTheme.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var recommendation: String {
+        guard !results.isEmpty else { return "Start with a short, easy practice session to create a first progress snapshot." }
+        if averageScore(results) >= 80 { return "Subtraction is improving. Continue with easy practice before moving to medium difficulty." }
+        return "A short easy session can help rebuild confidence and strengthen the basics."
+    }
+}
+
+struct PremiumPracticeRow: View {
+    let exam: Exam
+    let onStart: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(alignment: .top) {
+                Image(systemName: subjectIcon)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(ScholarTheme.primary)
+                    .frame(width: 52, height: 52)
+                    .background(ScholarTheme.secondaryContainer.opacity(0.72))
+                    .clipShape(Circle())
+                Spacer()
+                Text(assignedLabel)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(ScholarTheme.controlSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text(exam.subject)
+                    .font(.title2.bold())
+                    .foregroundStyle(ScholarTheme.onSurface)
+                Text("\(exam.difficulty) • \(exam.questions.count) Questions")
+                    .font(.headline)
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+            }
+            Button(action: onStart) {
+                Label("Start Practice", systemImage: "arrow.right")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(ScholarTheme.onSurface)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(ScholarTheme.surfaceContainerHigh)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(24)
+        .background(ScholarTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(ScholarTheme.hairline(), lineWidth: 1)
+        }
+        .shadow(color: ScholarTheme.shadow, radius: 12, y: 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var assignedLabel: String {
+        Calendar.current.isDateInToday(exam.createdAt) ? "Assigned Today" : "Assigned \(DateFormatter.localizedString(from: exam.createdAt, dateStyle: .medium, timeStyle: .none))"
+    }
+
+    private var subjectIcon: String {
+        switch exam.subject {
+        case Subject.maths.rawValue: "plus.forwardslash.minus"
+        case Subject.english.rawValue: "book"
+        case Subject.hindi.rawValue: "character.book.closed"
+        case Subject.evs.rawValue: "leaf"
+        default: "doc.text"
+        }
+    }
+}
+
+struct PremiumResultRow: View {
+    let result: ExamResult
+
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(spacing: 6) {
+                Circle()
+                    .fill(result.percentage >= 70 ? ScholarTheme.success : ScholarTheme.warning)
+                    .frame(width: 10, height: 10)
+                Rectangle()
+                    .fill(ScholarTheme.primary.opacity(0.12))
+                    .frame(width: 2, height: 44)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(result.subject) Practice")
+                    .font(.headline)
+                Text(DateFormatter.localizedString(from: result.completedAt, dateStyle: .medium, timeStyle: .none))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ScholarTheme.secondaryText)
+                Text("\(result.percentage)% • \(result.correctAnswers) of \(result.totalQuestions) correct")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ScholarTheme.secondaryText)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct SubjectProgressList: View {
+    let results: [ExamResult]
+
+    var body: some View {
+        let summaries = subjectSummaries(results)
+        if summaries.isEmpty {
+            LSEmptyState(icon: "books.vertical", title: "No subject progress yet", message: "Subjects will appear after completed practice.")
+        } else {
+            VStack(spacing: 22) {
+                ForEach(summaries, id: \.subject) { summary in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(summary.subject).font(.headline)
+                            Spacer()
+                            Text("\(summary.average)%")
+                                .font(.headline)
+                                .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                        }
+                        ProgressView(value: Double(summary.average), total: 100)
+                            .tint(ScholarTheme.primary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct PerformanceTrendView: View {
+    let results: [ExamResult]
+
+    private var recentResults: [ExamResult] {
+        Array(results.prefix(8).reversed())
+    }
+
+    var body: some View {
+        if recentResults.isEmpty {
+            LSEmptyState(icon: "chart.line.uptrend.xyaxis", title: "No completed practice", message: "Recent progress will appear after your child completes practice.")
+        } else {
+            GeometryReader { proxy in
+                let points = trendPoints(in: proxy.size)
+                ZStack(alignment: .bottomLeading) {
+                    Path { path in
+                        guard let first = points.first else { return }
+                        path.move(to: CGPoint(x: first.x, y: proxy.size.height))
+                        for point in points {
+                            path.addLine(to: point)
+                        }
+                        if let last = points.last {
+                            path.addLine(to: CGPoint(x: last.x, y: proxy.size.height))
+                        }
+                        path.closeSubpath()
+                    }
+                    .fill(
+                        LinearGradient(
+                            colors: [ScholarTheme.onSurface.opacity(0.28), ScholarTheme.onSurface.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                    Path { path in
+                        guard let first = points.first else { return }
+                        path.move(to: first)
+                        for point in points.dropFirst() {
+                            path.addLine(to: point)
+                        }
+                    }
+                    .stroke(ScholarTheme.outline.opacity(0.35), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+
+                    ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                        Circle()
+                            .fill(ScholarTheme.onSurface)
+                            .frame(width: 8, height: 8)
+                            .position(point)
+                    }
+                }
+                .overlay(alignment: .bottomLeading) {
+                    HStack {
+                        Text("First")
+                        Spacer()
+                        Text("Latest")
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                    .padding(.horizontal, 4)
+                }
+            }
+            .frame(height: 280)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Recent performance trend")
+        }
+    }
+
+    private func trendPoints(in size: CGSize) -> [CGPoint] {
+        guard recentResults.count > 1 else {
+            let y = size.height * (1 - CGFloat(recentResults.first?.percentage ?? 0) / 100)
+            return [CGPoint(x: size.width * 0.5, y: y)]
+        }
+        return recentResults.enumerated().map { index, result in
+            let x = CGFloat(index) / CGFloat(max(recentResults.count - 1, 1)) * size.width
+            let y = max(16, min(size.height - 28, size.height * (1 - CGFloat(result.percentage) / 100)))
+            return CGPoint(x: x, y: y)
+        }
+    }
+}
+
+struct FocusAreasCard: View {
+    let results: [ExamResult]
+
+    var body: some View {
+        LSCard {
+            VStack(alignment: .leading, spacing: 24) {
+                Text("Focus Areas")
+                    .font(.title.bold())
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Strong Areas", systemImage: "star")
+                            .font(.caption.weight(.semibold))
+                            .textCase(.uppercase)
+                            .foregroundStyle(ScholarTheme.primary)
+                        FocusPill(icon: "books.vertical", title: strongAreaTitle)
+                        FocusPill(icon: "book", title: "Reading Comprehension")
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Needs Practice", systemImage: "brain.head.profile")
+                            .font(.caption.weight(.semibold))
+                            .textCase(.uppercase)
+                            .foregroundStyle(ScholarTheme.tertiary)
+                        FocusPill(icon: "pencil", title: needsPracticeTitle, tint: ScholarTheme.tertiary)
+                        FocusPill(icon: "minus.plus.batteryblock", title: "Subtraction Borrowing", tint: ScholarTheme.tertiary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var strongAreaTitle: String {
+        guard let best = subjectSummaries(results).max(by: { $0.average < $1.average }) else { return "Complete practice" }
+        return "\(best.subject) Confidence"
+    }
+
+    private var needsPracticeTitle: String {
+        guard let weakest = subjectSummaries(results).min(by: { $0.average < $1.average }) else { return "Complete practice" }
+        return "\(weakest.subject) Review"
+    }
+}
+
+struct FocusPill: View {
+    let icon: String
+    let title: String
+    var tint: Color = ScholarTheme.primary
+
+    var body: some View {
+        Label(title, systemImage: icon)
+            .font(.headline)
+            .foregroundStyle(ScholarTheme.onSurface)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(tint.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(ScholarTheme.outlineVariant.opacity(0.55), lineWidth: 1)
+            }
+    }
+}
+
+struct LSRecentExamLine: View {
+    let result: ExamResult
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(result.subject) Practice")
+                    .font(.headline)
+                    .foregroundStyle(ScholarTheme.onSurface)
+                Text(DateFormatter.localizedString(from: result.completedAt, dateStyle: .medium, timeStyle: .none))
+                    .font(.caption)
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+            }
+            Spacer()
+            Text("\(result.correctAnswers)/\(result.totalQuestions)")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(ScholarTheme.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(ScholarTheme.controlSurface)
+                .clipShape(Capsule())
+        }
+        .padding(.vertical, 14)
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.45)
+        }
+    }
+}
+
+struct StrengthPracticeGrid: View {
+    let results: [ExamResult]
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 14)], spacing: 14) {
+            LSCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    LSSectionHeader(title: "Strong Areas", subtitle: "Celebrate what is working", icon: "star.fill")
+                    Text(strongArea)
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            LSCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    LSSectionHeader(title: "Needs Practice", subtitle: "A friendly focus area", icon: "target")
+                    Text(needsPractice)
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var strongArea: String {
+        guard let best = subjectSummaries(results).max(by: { $0.average < $1.average }) else { return "Complete practice to discover strong areas." }
+        return "\(best.subject) is currently the strongest area at \(best.average)%."
+    }
+
+    private var needsPractice: String {
+        guard let weakest = subjectSummaries(results).min(by: { $0.average < $1.average }) else { return "Complete practice to identify helpful focus areas." }
+        return "\(weakest.subject) could use a little extra attention this week."
+    }
+}
+
+struct InsightEditorialCard: View {
+    let title: String
+    let icon: String
+    let tint: Color
+    let items: [(String, String)]
+
+    var body: some View {
+        LSCard {
+            VStack(alignment: .leading, spacing: 24) {
+                HStack(spacing: 14) {
+                    Image(systemName: icon)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(tint)
+                        .frame(width: 44, height: 44)
+                        .background(tint.opacity(0.18))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    Text(title)
+                        .font(.title.bold())
+                }
+                VStack(alignment: .leading, spacing: 18) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                        HStack(alignment: .top, spacing: 14) {
+                            Circle()
+                                .stroke(tint, lineWidth: 1.4)
+                                .frame(width: 10, height: 10)
+                                .padding(.top, 7)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.0)
+                                    .font(.headline)
+                                Text(item.1)
+                                    .font(.body)
+                                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct LSPacingLevelView: View {
+    let score: Int
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text("Easy")
+                Spacer()
+                Text("Medium")
+                    .foregroundStyle(ScholarTheme.primary)
+                Spacer()
+                Text("Hard")
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ScholarTheme.onSurfaceVariant)
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(ScholarTheme.surfaceVariant)
+                    Capsule()
+                        .fill(ScholarTheme.primary)
+                        .frame(width: max(44, proxy.size.width * CGFloat(min(max(score, 35), 90)) / 100))
+                }
+            }
+            .frame(height: 8)
+        }
+    }
+}
+
+struct LSDarkPlanCard: View {
+    let onUpgrade: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 34) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Current Plan")
+                        .font(.caption.weight(.semibold))
+                        .textCase(.uppercase)
+                        .tracking(2)
+                        .foregroundStyle(.white.opacity(0.72))
+                    Text("Little Scholar Plus")
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundStyle(ScholarTheme.cardBackground)
+                }
+                Spacer()
+                Image(systemName: "star.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(ScholarTheme.primarySoft)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 18) {
+                PlanBenefit(title: "Up to 5 Children")
+                PlanBenefit(title: "Unlimited Practice")
+                PlanBenefit(title: "Daily AI Insights")
+                PlanBenefit(title: "Advanced Reports")
+            }
+
+            Button(action: onUpgrade) {
+                Label("Manage Subscription", systemImage: "arrow.right")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(ScholarTheme.primary)
+                    .padding(.horizontal, 26)
+                    .frame(minHeight: 54)
+                    .background(ScholarTheme.cardBackground)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(28)
+        .background(
+            LinearGradient(
+                colors: [ScholarTheme.darkOlive, ScholarTheme.primaryContainer.opacity(0.88)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: ScholarTheme.primary.opacity(0.16), radius: 20, y: 12)
+    }
+}
+
+struct PlanBenefit: View {
+    let title: String
+
+    var body: some View {
+        Label(title, systemImage: "checkmark.circle")
+            .font(.headline)
+            .foregroundStyle(Color.white.opacity(0.92))
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct LSProfileMenuRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let tint: Color
+    var isDestructive = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 18) {
+                Image(systemName: icon)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 50, height: 50)
+                    .background(tint.opacity(0.12))
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.title3.bold())
+                        .foregroundStyle(isDestructive ? ScholarTheme.error : ScholarTheme.onSurface)
+                    if !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                    }
+                }
+                Spacer()
+                if !isDestructive {
+                    Image(systemName: "chevron.right")
+                        .font(.headline)
+                        .foregroundStyle(ScholarTheme.outline)
+                }
+            }
+            .padding(24)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct LSProfileAvatarStrip: View {
+    let profiles: [ChildProfile]
+    @Binding var selectedChildID: UUID?
+    let results: [ExamResult]
+    let canAdd: Bool
+    let onEdit: (ChildProfile) -> Void
+    let onDelete: (ChildProfile) -> Void
+    let onAdd: () -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 28) {
+                ForEach(profiles) { profile in
+                    VStack(spacing: 10) {
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                                selectedChildID = profile.profileID
+                            }
+                        } label: {
+                            ChildProfilePhotoBadge(avatarValue: profile.avatar, isSelected: selectedChildID == profile.profileID, size: 72)
+                        }
+                        .buttonStyle(.plain)
+                        Text(profile.name)
+                            .font(.headline)
+                            .foregroundStyle(selectedChildID == profile.profileID ? ScholarTheme.primary : ScholarTheme.onSurface)
+                            .lineLimit(1)
+                            .frame(width: 86)
+                    }
+                    .contextMenu {
+                        Button("Edit") { onEdit(profile) }
+                        Button("Delete", role: .destructive) { onDelete(profile) }
+                    }
+                }
+                if canAdd {
+                    Button(action: onAdd) {
+                        VStack(spacing: 10) {
+                            Image(systemName: "plus")
+                                .font(.title.weight(.medium))
+                                .foregroundStyle(ScholarTheme.primary)
+                                .frame(width: 72, height: 72)
+                                .background(ScholarTheme.controlSurface)
+                                .clipShape(Circle())
+                                .overlay {
+                                    Circle().stroke(ScholarTheme.outlineVariant, style: StrokeStyle(lineWidth: 1.4, dash: [5, 5]))
+                                }
+                            Text("Add New")
+                                .font(.headline)
+                                .foregroundStyle(ScholarTheme.onSurface)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add new child profile")
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+}
+
+struct InsightReport: View {
+    let results: [ExamResult]
+
+    var body: some View {
+        VStack(spacing: 16) {
+            LSCard { insightBlock(title: "Summary", icon: "lightbulb.fill", text: summary) }
+            LSCard { insightBlock(title: "Strengths", icon: "star.circle.fill", text: strength) }
+            LSCard { insightBlock(title: "Needs Practice", icon: "target", text: focus) }
+            LSCard { insightBlock(title: "Recommendations", icon: "checklist", text: recommendation) }
+            LSCard { insightBlock(title: "Suggested Difficulty", icon: "slider.horizontal.3", text: suggestedDifficulty) }
+        }
+    }
+
+    private func insightBlock(title: String, icon: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            LSSectionHeader(title: title, subtitle: "Generated from completed practice", icon: icon)
+            Text(text)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Updated \(DateFormatter.localizedString(from: .now, dateStyle: .medium, timeStyle: .short))")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var summary: String {
+        "Average score is \(averageScore(results))% across \(results.count) completed sessions."
+    }
+
+    private var strength: String {
+        guard let best = subjectSummaries(results).max(by: { $0.average < $1.average }) else { return "Strengths will appear after more practice." }
+        return "\(best.subject) is showing the clearest confidence."
+    }
+
+    private var focus: String {
+        guard let weakest = subjectSummaries(results).min(by: { $0.average < $1.average }) else { return "Focus areas will appear after more practice." }
+        return "Spend a little extra time on \(weakest.subject)."
+    }
+
+    private var recommendation: String {
+        averageScore(results) >= 80 ? "Try a medium or hard practice session next." : "Use an easy session to reinforce core ideas."
+    }
+
+    private var suggestedDifficulty: String {
+        averageScore(results) >= 85 ? "Hard" : averageScore(results) >= 65 ? "Medium" : "Easy"
+    }
+}
+
+struct PremiumComingSoonView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            PremiumScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    PremiumHeader(eyebrow: "Premium", title: "Premium coming soon", subtitle: "A richer learning toolkit is on the way.")
+                    LSHeroCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            PremiumBenefit(icon: "person.2.fill", title: "Up to 5 children")
+                            PremiumBenefit(icon: "infinity.circle.fill", title: "Unlimited question generation")
+                            PremiumBenefit(icon: "sparkles", title: "Daily learning insight per child")
+                            PremiumBenefit(icon: "chart.bar.doc.horizontal.fill", title: "Advanced learning reports")
+                            PremiumBenefit(icon: "doc.richtext.fill", title: "Future PDF reports")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Premium")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+    }
+}
+
+struct AppSettingsComingSoonView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            PremiumScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    PremiumHeader(
+                        eyebrow: "Settings",
+                        title: "App Settings",
+                        subtitle: "These controls are planned for a future Little Scholar update."
+                    )
+
+                    LSCard {
+                        VStack(spacing: 0) {
+                            DisabledSettingsRow(
+                                icon: "bell.badge",
+                                title: "Notifications",
+                                subtitle: "Practice reminders and progress alerts"
+                            )
+                            Divider().padding(.leading, 68)
+                            DisabledSettingsRow(
+                                icon: "speaker.wave.2",
+                                title: "Audio",
+                                subtitle: "Sound effects and spoken guidance"
+                            )
+                            Divider().padding(.leading, 68)
+                            DisabledSettingsRow(
+                                icon: "circle.lefthalf.filled",
+                                title: "Display",
+                                subtitle: "Theme, text size, and visual preferences"
+                            )
+                        }
+                    }
+                }
+            }
+            .navigationTitle("App Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct DisabledSettingsRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: 18) {
+            Image(systemName: icon)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                .frame(width: 50, height: 50)
+                .background(ScholarTheme.controlSurface)
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.title3.bold())
+                    .foregroundStyle(ScholarTheme.onSurface)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+            }
+
+            Spacer()
+
+            Text("Coming Soon")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(ScholarTheme.controlSurface)
+                .clipShape(Capsule())
+        }
+        .padding(.vertical, 16)
+        .opacity(0.58)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), coming soon")
+    }
+}
+
+struct PremiumBenefit: View {
+    let icon: String
+    let title: String
+
+    var body: some View {
+        Label(title, systemImage: icon)
+            .font(.headline)
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(ScholarTheme.cardBackground.opacity(0.72))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+private struct SubjectSummary {
+    let subject: String
+    let average: Int
+}
+
+private func selectedChild(in profiles: [ChildProfile], selectedChildID: UUID?) -> ChildProfile? {
+    if let selectedChildID, let profile = profiles.first(where: { $0.profileID == selectedChildID }) {
+        return profile
+    }
+    return profiles.first
+}
+
+private func resultsForSelectedChild(_ results: [ExamResult], childID: UUID?) -> [ExamResult] {
+    guard let childID else { return results }
+    return results.filter { $0.childProfileID == childID }
+}
+
+private func averageScore(_ results: [ExamResult]) -> Int {
+    guard !results.isEmpty else { return 0 }
+    return Int((Double(results.map(\.percentage).reduce(0, +)) / Double(results.count)).rounded())
+}
+
+private func bestScore(_ results: [ExamResult]) -> Int {
+    results.map(\.percentage).max() ?? 0
+}
+
+private func subjectSummaries(_ results: [ExamResult]) -> [SubjectSummary] {
+    Subject.allCases.compactMap { subject in
+        let subjectResults = results.filter { $0.subject == subject.rawValue }
+        guard !subjectResults.isEmpty else { return nil }
+        return SubjectSummary(subject: subject.rawValue, average: averageScore(subjectResults))
+    }
+}
+
+private let childProfilePhotoPrefix = "photo:jpeg;base64,"
+
+private func childProfileImage(from avatarValue: String) -> UIImage? {
+    guard avatarValue.hasPrefix(childProfilePhotoPrefix) else { return nil }
+    let base64 = String(avatarValue.dropFirst(childProfilePhotoPrefix.count))
+    guard let data = Data(base64Encoded: base64) else { return nil }
+    return UIImage(data: data)
+}
+
+private func childProfileAvatarValue(from imageData: Data) -> String? {
+    guard let image = UIImage(data: imageData) else { return nil }
+    let resized = image.resizedForChildProfile(maxDimension: 520)
+    guard let jpegData = resized.jpegData(compressionQuality: 0.78) else { return nil }
+    return childProfilePhotoPrefix + jpegData.base64EncodedString()
+}
+
+private extension UIImage {
+    func resizedForChildProfile(maxDimension: CGFloat) -> UIImage {
+        let longestSide = max(size.width, size.height)
+        guard longestSide > maxDimension else { return self }
+
+        let scale = maxDimension / longestSide
+        let targetSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        return renderer.image { _ in
+            draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+    }
 }
 
 private extension View {

@@ -4,12 +4,12 @@ struct ExamPreviewView: View {
     let exams: [Exam]
 
     var body: some View {
-        sectionCard(title: "Pending Exam Papers", icon: "tray.full.fill") {
+        sectionCard(title: "Pending Practice", icon: "tray.full.fill") {
             if exams.isEmpty {
                 EmptyStateView(
                     icon: "tray",
                     title: "No pending papers",
-                    message: "Generated exams will wait here until the kid completes them."
+                    message: "Generated practice will wait here until your child completes it."
                 )
             } else {
                 LazyVStack(spacing: 12) {
@@ -32,7 +32,7 @@ struct ExamQuestionPreviewView: View {
 
     var body: some View {
         List {
-            Section("Exam") {
+            Section("Practice") {
                 LabeledContent("Kid", value: exam.childName)
                 LabeledContent("Grade", value: exam.grade)
                 LabeledContent("Subject", value: exam.subject)
@@ -46,13 +46,13 @@ struct ExamQuestionPreviewView: View {
                             .font(.headline)
                         Text("Answer: \(question.correctAnswer)")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.teal)
+                            .foregroundStyle(ScholarTheme.primary)
                     }
                     .padding(.vertical, 6)
                 }
             }
         }
-        .navigationTitle("Exam Preview")
+        .navigationTitle("Practice Preview")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -64,7 +64,7 @@ struct ExamPreviewRow: View {
         HStack(spacing: 12) {
             Image(systemName: "doc.text.fill")
                 .font(.title)
-                .foregroundStyle(.teal)
+                .foregroundStyle(ScholarTheme.primary)
                 .frame(width: 42)
 
             VStack(alignment: .leading, spacing: 4) {

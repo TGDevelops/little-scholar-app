@@ -5,7 +5,7 @@ struct ExamHistoryView: View {
 
     var body: some View {
         if results.isEmpty {
-            EmptyStateView(icon: "clock.badge.questionmark", title: "No completed exams", message: "Completed exam results will appear here.")
+            EmptyStateView(icon: "clock.badge.questionmark", title: "No completed practice", message: "Completed practice results will appear here.")
                 .padding(.top, 24)
         } else {
             LazyVStack(spacing: 14) {
@@ -42,7 +42,7 @@ struct ResultHistoryRow: View {
 
                 Text("\(result.percentage)%")
                     .font(.title.bold())
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ScholarTheme.primary)
             }
 
             Text(result.completedAt.formatted(date: .abbreviated, time: .shortened))
@@ -51,7 +51,7 @@ struct ResultHistoryRow: View {
 
             Text("\(result.correctAnswers) correct, \(result.totalQuestions - result.correctAnswers) wrong")
                 .font(.headline)
-                .foregroundStyle(.teal)
+                .foregroundStyle(ScholarTheme.primary)
         }
         .padding()
         .background(Color.white.opacity(0.9))

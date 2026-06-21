@@ -9,7 +9,7 @@ struct ResultView: View {
                 VStack(spacing: 12) {
                     Image(systemName: result.percentage >= 70 ? "star.circle.fill" : "heart.circle.fill")
                         .font(.system(size: 64))
-                        .foregroundStyle(result.percentage >= 70 ? .yellow : .pink)
+                        .foregroundStyle(result.percentage >= 70 ? ScholarTheme.warning : ScholarTheme.error)
 
                     Text("Great try, \(result.childName)!")
                         .font(.title.bold())
@@ -20,7 +20,7 @@ struct ResultView: View {
 
                     Text("\(result.percentage)% • \(result.reportGrade)")
                         .font(.title2.bold())
-                        .foregroundStyle(.teal)
+                        .foregroundStyle(ScholarTheme.primary)
 
                     Text(result.feedback)
                         .font(.title3.weight(.medium))
@@ -37,7 +37,7 @@ struct ResultView: View {
             .padding()
         }
         .background(LittleScholarBackground())
-        .navigationTitle("Exam Result")
+        .navigationTitle("Practice Result")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -52,7 +52,7 @@ struct LatestResultBanner: View {
             HStack(spacing: 12) {
                 Image(systemName: "star.circle.fill")
                     .font(.system(size: 42))
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(ScholarTheme.warning)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Latest Result")
@@ -87,13 +87,13 @@ struct QuestionReviewList: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(item.isCorrect ? "Correct" : "Needs Practice", systemImage: item.isCorrect ? "checkmark.seal.fill" : "xmark.seal.fill")
                         .font(.headline)
-                        .foregroundStyle(item.isCorrect ? .green : .red)
+                        .foregroundStyle(item.isCorrect ? ScholarTheme.success : ScholarTheme.error)
 
                     Text(item.question.prompt)
                         .font(.headline)
 
                     Text("Your answer: \(item.selectedAnswer)")
-                        .foregroundStyle(item.isCorrect ? .green : .red)
+                        .foregroundStyle(item.isCorrect ? ScholarTheme.success : ScholarTheme.error)
 
                     if !item.isCorrect {
                         Text("Correct answer: \(item.question.correctAnswer)")

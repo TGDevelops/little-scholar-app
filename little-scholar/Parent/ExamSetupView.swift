@@ -12,12 +12,12 @@ struct ExamSetupView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            sectionCard(title: "Generate Exam Paper", icon: "doc.badge.plus") {
+            sectionCard(title: "Generate Practice", icon: "doc.badge.plus") {
                 if profiles.isEmpty {
                     EmptyStateView(
                         icon: "person.2.slash",
                         title: "Add a kid first",
-                        message: "Go to Parent Mode and create a kid profile before making an exam."
+                        message: "Create a child profile before making practice."
                     )
                 } else {
                     VStack(alignment: .leading, spacing: 14) {
@@ -49,10 +49,10 @@ struct ExamSetupView: View {
                             guard let selectedProfile else { return }
                             onGenerateExam(selectedProfile, selectedSubject, selectedDifficulty, numberOfQuestions)
                         } label: {
-                            Label("Generate Exam Paper", systemImage: "sparkles")
+                            Label("Generate Practice", systemImage: "sparkles")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(CheerfulButtonStyle(color: .teal))
+                        .buttonStyle(CheerfulButtonStyle(color: ScholarTheme.primary))
                         .disabled(selectedProfile == nil)
                     }
                 }
