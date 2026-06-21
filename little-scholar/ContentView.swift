@@ -14,6 +14,7 @@ import UIKit
 @Model
 final class ChildProfile {
     var profileID: UUID = UUID()
+    var backendChildID: String?
     var parentID: String = ""
     var name: String = ""
     var age: Int = 6
@@ -21,8 +22,9 @@ final class ChildProfile {
     var avatar: String = KidAvatar.unicorn.rawValue
     var createdAt: Date = Date.now
 
-    init(profileID: UUID = UUID(), parentID: String = "", name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
+    init(profileID: UUID = UUID(), backendChildID: String? = nil, parentID: String = "", name: String, age: Int, grade: String, avatar: KidAvatar = .unicorn, createdAt: Date = .now) {
         self.profileID = profileID
+        self.backendChildID = backendChildID
         self.parentID = parentID
         self.name = name
         self.age = age
@@ -117,6 +119,13 @@ struct Question: Codable, Identifiable, Hashable {
     var explanation: String
     var topic: String = "General"
     var marks: Int = 1
+    var visualElements: [String] = []
+    var leftItems: [String] = []
+    var rightItems: [String] = []
+    var passage: String?
+    var categories: [String] = []
+    var learningObjective: String = ""
+    var difficultyLevel: String = ""
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -129,6 +138,13 @@ struct Question: Codable, Identifiable, Hashable {
         case explanation
         case topic
         case marks
+        case visualElements
+        case leftItems
+        case rightItems
+        case passage
+        case categories
+        case learningObjective
+        case difficultyLevel
     }
 
     init(
@@ -141,7 +157,14 @@ struct Question: Codable, Identifiable, Hashable {
         acceptableAnswers: [String] = [],
         explanation: String,
         topic: String = "General",
-        marks: Int = 1
+        marks: Int = 1,
+        visualElements: [String] = [],
+        leftItems: [String] = [],
+        rightItems: [String] = [],
+        passage: String? = nil,
+        categories: [String] = [],
+        learningObjective: String = "",
+        difficultyLevel: String = ""
     ) {
         self.id = id
         self.backendID = backendID
@@ -153,6 +176,13 @@ struct Question: Codable, Identifiable, Hashable {
         self.explanation = explanation
         self.topic = topic
         self.marks = marks
+        self.visualElements = visualElements
+        self.leftItems = leftItems
+        self.rightItems = rightItems
+        self.passage = passage
+        self.categories = categories
+        self.learningObjective = learningObjective
+        self.difficultyLevel = difficultyLevel
     }
 
     init(from decoder: Decoder) throws {
@@ -167,12 +197,36 @@ struct Question: Codable, Identifiable, Hashable {
         explanation = try container.decode(String.self, forKey: .explanation)
         topic = try container.decodeIfPresent(String.self, forKey: .topic) ?? "General"
         marks = try container.decodeIfPresent(Int.self, forKey: .marks) ?? 1
+        visualElements = try container.decodeIfPresent([String].self, forKey: .visualElements) ?? []
+        leftItems = try container.decodeIfPresent([String].self, forKey: .leftItems) ?? []
+        rightItems = try container.decodeIfPresent([String].self, forKey: .rightItems) ?? []
+        passage = try container.decodeIfPresent(String.self, forKey: .passage)
+        categories = try container.decodeIfPresent([String].self, forKey: .categories) ?? []
+        learningObjective = try container.decodeIfPresent(String.self, forKey: .learningObjective) ?? ""
+        difficultyLevel = try container.decodeIfPresent(String.self, forKey: .difficultyLevel) ?? ""
     }
 
     func accepts(_ answer: String) -> Bool {
-        let normalizedAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let accepted = ([correctAnswer] + acceptableAnswers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-        return accepted.contains(normalizedAnswer)
+        switch normalizedQuestionType(type) {
+        case "simple_match", "match_following":
+            guard let answerMap = decodedStringMap(answer), let correctMap = decodedStringMap(correctAnswer) else {
+                return normalizedAnswerString(answer) == normalizedAnswerString(correctAnswer)
+            }
+            return normalizedMap(answerMap) == normalizedMap(correctMap)
+        case "sequence_ordering":
+            guard let answerArray = decodedStringArray(answer), let correctArray = decodedStringArray(correctAnswer) else {
+                return normalizedAnswerString(answer) == normalizedAnswerString(correctAnswer)
+            }
+            return answerArray.map(normalizedAnswerString) == correctArray.map(normalizedAnswerString)
+        case "categorization":
+            guard let answerMap = decodedStringArrayMap(answer), let correctMap = decodedStringArrayMap(correctAnswer) else {
+                return normalizedAnswerString(answer) == normalizedAnswerString(correctAnswer)
+            }
+            return normalizedArrayMap(answerMap) == normalizedArrayMap(correctMap)
+        default:
+            let accepted = ([correctAnswer] + acceptableAnswers).map(normalizedAnswerString)
+            return accepted.contains(normalizedAnswerString(answer))
+        }
     }
 }
 
@@ -293,6 +347,82 @@ enum ScholarTheme {
     }
 }
 
+func normalizedQuestionType(_ type: String) -> String {
+    type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+}
+
+func normalizedAnswerString(_ value: String) -> String {
+    value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+}
+
+func encodedStringArray(_ array: [String]) -> String {
+    guard let data = try? JSONSerialization.data(withJSONObject: array, options: [.sortedKeys]),
+          let string = String(data: data, encoding: .utf8) else {
+        return array.joined(separator: ", ")
+    }
+    return string
+}
+
+func encodedStringMap(_ map: [String: String]) -> String {
+    guard let data = try? JSONSerialization.data(withJSONObject: map, options: [.sortedKeys]),
+          let string = String(data: data, encoding: .utf8) else {
+        return map.map { "\($0.key): \($0.value)" }.sorted().joined(separator: ", ")
+    }
+    return string
+}
+
+func encodedStringArrayMap(_ map: [String: [String]]) -> String {
+    guard let data = try? JSONSerialization.data(withJSONObject: map, options: [.sortedKeys]),
+          let string = String(data: data, encoding: .utf8) else {
+        return map.map { "\($0.key): \($0.value.joined(separator: ", "))" }.sorted().joined(separator: "; ")
+    }
+    return string
+}
+
+func decodedStringArray(_ value: String) -> [String]? {
+    guard let data = value.data(using: .utf8),
+          let array = try? JSONSerialization.jsonObject(with: data) as? [String] else { return nil }
+    return array
+}
+
+func decodedStringMap(_ value: String) -> [String: String]? {
+    guard let data = value.data(using: .utf8),
+          let map = try? JSONSerialization.jsonObject(with: data) as? [String: String] else { return nil }
+    return map
+}
+
+func decodedStringArrayMap(_ value: String) -> [String: [String]]? {
+    guard let data = value.data(using: .utf8),
+          let map = try? JSONSerialization.jsonObject(with: data) as? [String: [String]] else { return nil }
+    return map
+}
+
+func normalizedMap(_ map: [String: String]) -> [String: String] {
+    Dictionary(uniqueKeysWithValues: map.map { (normalizedAnswerString($0.key), normalizedAnswerString($0.value)) })
+}
+
+func normalizedArrayMap(_ map: [String: [String]]) -> [String: [String]] {
+    Dictionary(uniqueKeysWithValues: map.map { key, values in
+        (normalizedAnswerString(key), values.map(normalizedAnswerString).sorted())
+    })
+}
+
+func displayStoredAnswer(_ value: String) -> String {
+    if let map = decodedStringArrayMap(value) {
+        return map.keys.sorted().map { key in
+            let values = map[key, default: []].joined(separator: ", ")
+            return "\(key): \(values)"
+        }.joined(separator: " • ")
+    }
+    if let map = decodedStringMap(value) {
+        return map.keys.sorted().map { "\($0) → \(map[$0] ?? "")" }.joined(separator: " • ")
+    }
+    if let array = decodedStringArray(value) {
+        return array.joined(separator: " → ")
+    }
+    return value
+}
+
 enum AppMode: String, CaseIterable, Identifiable {
     case home = "Home"
     case practice = "Practice"
@@ -366,6 +496,8 @@ struct AnswerEvaluationService {
         let evaluations = exam.questions.map { question in
             AnswerEvaluation(id: question.id, question: question, selectedAnswer: answers[question.id] ?? "No answer")
         }
+        let totalMarks = exam.questions.reduce(0) { $0 + max($1.marks, 1) }
+        let earnedMarks = evaluations.reduce(0) { $0 + ($1.isCorrect ? max($1.question.marks, 1) : 0) }
 
         return ExamResult(
             childProfileID: exam.childProfileID,
@@ -373,8 +505,8 @@ struct AnswerEvaluationService {
             grade: exam.grade,
             subject: exam.subject,
             difficulty: exam.difficulty,
-            totalQuestions: exam.questions.count,
-            correctAnswers: evaluations.filter(\.isCorrect).count,
+            totalQuestions: max(totalMarks, exam.questions.count),
+            correctAnswers: earnedMarks,
             evaluations: evaluations
         )
     }
@@ -394,13 +526,28 @@ enum APIError: LocalizedError {
     }
 }
 
+enum APIConfiguration {
+    static let developmentBaseURL = "http://localhost:3000"
+    static let productionBaseURL = "https://little-scholar-server-production.up.railway.app"
+    static let placeholderRailwayBaseURL = "https://your-railway-domain.up.railway.app"
+
+    static var defaultBaseURL: String {
+        #if DEBUG
+        developmentBaseURL
+        #else
+        productionBaseURL
+        #endif
+    }
+}
+
 struct APIClient {
     let baseURLString: String
     var accessToken: String?
 
     private var baseURL: URL {
         get throws {
-            guard let url = URL(string: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)), !baseURLString.isEmpty else {
+            let trimmedBaseURL = baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let url = URL(string: trimmedBaseURL), !trimmedBaseURL.isEmpty else {
                 throw APIError.invalidBaseURL
             }
             return url
@@ -415,12 +562,33 @@ struct APIClient {
         try await post(path: "/api/auth/login", body: LoginRequestDTO(email: email, password: password), authorized: false)
     }
 
-    func generateExam(grade: String, subject: Subject, difficulty: Difficulty, questionCount: Int) async throws -> BackendExamPaperDTO {
+    func createChild(name: String, age: Int, grade: String) async throws -> BackendChildProfileDTO {
         try await post(
-            path: "/api/exams/generate",
-            body: GenerateExamRequestDTO(grade: grade, subject: subject.rawValue, difficulty: difficulty.rawValue, questionCount: questionCount),
+            path: "/api/children",
+            body: ChildProfileRequestDTO(name: name, age: age, grade: grade, avatarUrl: nil),
             authorized: true
         )
+    }
+
+    func listChildren() async throws -> [BackendChildProfileDTO] {
+        try await get(path: "/api/children", authorized: true)
+    }
+
+    func generateExam(childID: String, grade: String, subject: Subject, difficulty: Difficulty, questionCount: Int) async throws -> BackendExamPaperDTO {
+        let path = "/api/children/\(childID)/exams/generate"
+        do {
+            return try await post(
+                path: path,
+                body: GenerateExamRequestDTO(subject: subject.rawValue, difficulty: difficulty.rawValue, questionCount: questionCount),
+                authorized: true
+            )
+        } catch APIError.server(let message) where message.localizedCaseInsensitiveContains("validation") {
+            return try await post(
+                path: path,
+                body: GenerateExamWithGradeRequestDTO(grade: grade, subject: subject.rawValue, difficulty: difficulty.rawValue, questionCount: questionCount),
+                authorized: true
+            )
+        }
     }
 
     private func post<Request: Encodable, Response: Decodable>(path: String, body: Request, authorized: Bool) async throws -> Response {
@@ -437,7 +605,25 @@ struct APIClient {
         guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(httpResponse.statusCode) else {
             let errorResponse = try? JSONDecoder().decode(ErrorResponseDTO.self, from: data)
-            throw APIError.server(errorResponse?.error.message ?? "Request failed with status \(httpResponse.statusCode).")
+            throw APIError.server(errorResponse?.error.displayMessage ?? "Request failed with status \(httpResponse.statusCode).")
+        }
+        let success = try JSONDecoder().decode(APISuccessResponse<Response>.self, from: data)
+        return success.data
+    }
+
+    private func get<Response: Decodable>(path: String, authorized: Bool) async throws -> Response {
+        let endpoint = try baseURL.appending(path: path)
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "GET"
+        if authorized, let accessToken, !accessToken.isEmpty {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let errorResponse = try? JSONDecoder().decode(ErrorResponseDTO.self, from: data)
+            throw APIError.server(errorResponse?.error.displayMessage ?? "Request failed with status \(httpResponse.statusCode).")
         }
         let success = try JSONDecoder().decode(APISuccessResponse<Response>.self, from: data)
         return success.data
@@ -450,9 +636,65 @@ struct APISuccessResponse<DataPayload: Decodable>: Decodable {
 }
 
 struct ErrorResponseDTO: Decodable {
-    struct APIErrorPayload: Decodable { let message: String }
+    struct APIErrorPayload: Decodable {
+        let message: String
+        let details: JSONValue?
+
+        var displayMessage: String {
+            guard let details else { return message }
+            return "\(message): \(details.readableDescription)"
+        }
+    }
     let success: Bool
     let error: APIErrorPayload
+}
+
+enum JSONValue: Decodable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case object([String: JSONValue])
+    case array([JSONValue])
+    case null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+        } else if let value = try? container.decode(String.self) {
+            self = .string(value)
+        } else if let value = try? container.decode(Double.self) {
+            self = .number(value)
+        } else if let value = try? container.decode(Bool.self) {
+            self = .bool(value)
+        } else if let value = try? container.decode([String: JSONValue].self) {
+            self = .object(value)
+        } else if let value = try? container.decode([JSONValue].self) {
+            self = .array(value)
+        } else {
+            self = .null
+        }
+    }
+
+    var readableDescription: String {
+        switch self {
+        case .string(let value):
+            return value
+        case .number(let value):
+            return value.rounded() == value ? String(Int(value)) : String(value)
+        case .bool(let value):
+            return value ? "true" : "false"
+        case .object(let values):
+            return values
+                .sorted { $0.key < $1.key }
+                .map { "\($0.key): \($0.value.readableDescription)" }
+                .joined(separator: ", ")
+        case .array(let values):
+            return values.map(\.readableDescription).joined(separator: ", ")
+        case .null:
+            return "null"
+        }
+    }
 }
 
 struct RegisterRequestDTO: Encodable {
@@ -468,10 +710,23 @@ struct LoginRequestDTO: Encodable {
 }
 
 struct GenerateExamRequestDTO: Encodable {
+    let subject: String
+    let difficulty: String
+    let questionCount: Int
+}
+
+struct GenerateExamWithGradeRequestDTO: Encodable {
     let grade: String
     let subject: String
     let difficulty: String
     let questionCount: Int
+}
+
+struct ChildProfileRequestDTO: Encodable {
+    let name: String
+    let age: Int
+    let grade: String
+    let avatarUrl: String?
 }
 
 struct AuthPayloadDTO: Decodable {
@@ -484,6 +739,17 @@ struct UserDTO: Decodable {
     let name: String
     let email: String
     let city: String
+}
+
+struct BackendChildProfileDTO: Decodable {
+    let id: String
+    let userId: String
+    let name: String
+    let age: Int
+    let grade: String
+    let avatarUrl: String?
+    let createdAt: String
+    let updatedAt: String
 }
 
 struct BackendExamPaperDTO: Decodable {
@@ -518,20 +784,27 @@ struct BackendQuestionDTO: Decodable {
     let type: String
     let question: String
     let options: [String]?
+    let visualElements: [String]?
+    let leftItems: [String]?
+    let rightItems: [String]?
+    let passage: String?
+    let categories: [String]?
     let correctAnswer: FlexibleAnswer
     let acceptableAnswers: [String]?
     let explanation: String
     let topic: String
+    let learningObjective: String?
+    let difficultyLevel: String?
     let marks: Int
 
     var questionModelOptions: [String] {
         if let options, !options.isEmpty { return options }
-        if type == "true_false" { return ["True", "False"] }
+        if ["true_false", "simple_true_false"].contains(normalizedQuestionType(type)) { return ["True", "False"] }
         return []
     }
 
     var questionModelCorrectAnswer: String {
-        correctAnswer.displayValue
+        correctAnswer.storageValue
     }
 
     var modelQuestion: Question {
@@ -544,7 +817,14 @@ struct BackendQuestionDTO: Decodable {
             acceptableAnswers: acceptableAnswers ?? [],
             explanation: explanation,
             topic: topic,
-            marks: marks
+            marks: marks,
+            visualElements: visualElements ?? [],
+            leftItems: leftItems ?? [],
+            rightItems: rightItems ?? [],
+            passage: passage,
+            categories: categories ?? [],
+            learningObjective: learningObjective ?? "",
+            difficultyLevel: difficultyLevel ?? ""
         )
     }
 }
@@ -552,7 +832,7 @@ struct BackendQuestionDTO: Decodable {
 enum FlexibleAnswer: Decodable {
     case string(String)
     case array([String])
-    case object([String: String])
+    case object([String: FlexibleAnswerObjectValue])
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -560,7 +840,7 @@ enum FlexibleAnswer: Decodable {
             self = .string(string)
         } else if let array = try? container.decode([String].self) {
             self = .array(array)
-        } else if let object = try? container.decode([String: String].self) {
+        } else if let object = try? container.decode([String: FlexibleAnswerObjectValue].self) {
             self = .object(object)
         } else {
             self = .string("")
@@ -571,7 +851,65 @@ enum FlexibleAnswer: Decodable {
         switch self {
         case .string(let value): value
         case .array(let values): values.joined(separator: ", ")
-        case .object(let object): object.values.joined(separator: ", ")
+        case .object(let object): object.values.map(\.displayValue).joined(separator: ", ")
+        }
+    }
+
+    var storageValue: String {
+        switch self {
+        case .string(let value): value
+        case .array(let values): encodedStringArray(values)
+        case .object(let object):
+            if object.values.contains(where: \.isArray) {
+                return encodedStringArrayMap(object.mapValues(\.arrayStorageValue))
+            }
+            return encodedStringMap(object.mapValues(\.stringStorageValue))
+        }
+    }
+}
+
+enum FlexibleAnswerObjectValue: Decodable {
+    case string(String)
+    case array([String])
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let string = try? container.decode(String.self) {
+            self = .string(string)
+        } else if let array = try? container.decode([String].self) {
+            self = .array(array)
+        } else {
+            self = .string("")
+        }
+    }
+
+    var isArray: Bool {
+        if case .array = self { return true }
+        return false
+    }
+
+    var displayValue: String {
+        switch self {
+        case .string(let value): value
+        case .array(let values): values.joined(separator: ", ")
+        }
+    }
+
+    var stringStorageValue: String {
+        switch self {
+        case .string(let value):
+            return value
+        case .array(let values):
+            return values.joined(separator: ", ")
+        }
+    }
+
+    var arrayStorageValue: [String] {
+        switch self {
+        case .string(let value):
+            return [value]
+        case .array(let values):
+            return values
         }
     }
 }
@@ -582,7 +920,7 @@ struct ContentView: View {
     @Query(sort: \Exam.createdAt, order: .reverse) private var exams: [Exam]
     @Query(sort: \ExamResult.completedAt, order: .reverse) private var results: [ExamResult]
 
-    @AppStorage("apiBaseURL") private var apiBaseURL = "https://little-scholar-server-production.up.railway.app"
+    @AppStorage("apiBaseURL") private var apiBaseURL = APIConfiguration.defaultBaseURL
     @AppStorage("parentID") private var parentID = ""
     @AppStorage("parentName") private var parentName = ""
     @AppStorage("parentEmail") private var parentEmail = ""
@@ -629,8 +967,7 @@ struct ContentView: View {
                     )
                 }
             }
-            .navigationTitle("Little Scholar")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .alert("Could not save", isPresented: saveErrorBinding) {
                 Button("OK", role: .cancel) { saveErrorMessage = nil }
             } message: {
@@ -870,7 +1207,9 @@ struct ContentView: View {
 
         Task {
             do {
+                let backendChildID = try await ensureBackendChildID(for: profile)
                 let backendExam = try await apiClient.generateExam(
+                    childID: backendChildID,
                     grade: backendGrade(for: profile.grade),
                     subject: subject,
                     difficulty: difficulty,
@@ -888,8 +1227,43 @@ struct ContentView: View {
         }
     }
 
+    private func ensureBackendChildID(for profile: ChildProfile) async throws -> String {
+        if let backendChildID = profile.backendChildID, !backendChildID.isEmpty {
+            return backendChildID
+        }
+
+        let backendAge = backendAge(for: profile.age)
+        let backendGrade = backendGrade(for: profile.grade)
+        let backendChildren = try await apiClient.listChildren()
+        if let matchingChild = backendChildren.first(where: { backendChildMatches($0, profile: profile, backendAge: backendAge, backendGrade: backendGrade) }) ?? backendChildren.first {
+            profile.backendChildID = matchingChild.id
+            try modelContext.save()
+            return matchingChild.id
+        }
+
+        let backendChild = try await apiClient.createChild(
+            name: profile.name,
+            age: backendAge,
+            grade: backendGrade
+        )
+        profile.backendChildID = backendChild.id
+        try modelContext.save()
+        return backendChild.id
+    }
+
+    private func backendChildMatches(_ backendChild: BackendChildProfileDTO, profile: ChildProfile, backendAge: Int, backendGrade: String) -> Bool {
+        backendChild.name.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(profile.name.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame
+            && backendChild.age == backendAge
+            && backendChild.grade == backendGrade
+    }
+
+    private func backendAge(for profileAge: Int) -> Int {
+        min(max(profileAge, 2), 10)
+    }
+
     private func backendGrade(for profileGrade: String) -> String {
         switch profileGrade {
+        case "Nursery": "Nursery"
         case "UKG": "UKG"
         case "Grade 1": "Grade 1"
         default: "LKG"
@@ -912,9 +1286,17 @@ struct ContentView: View {
     }
 
     private func migrateBackendURLIfNeeded() {
-        if apiBaseURL == "https://your-railway-domain.up.railway.app" || apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            apiBaseURL = "https://little-scholar-server-production.up.railway.app"
+        let trimmedBaseURL = apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedBaseURL == APIConfiguration.placeholderRailwayBaseURL || trimmedBaseURL.isEmpty {
+            apiBaseURL = APIConfiguration.defaultBaseURL
+            return
         }
+
+        #if DEBUG
+        if trimmedBaseURL == APIConfiguration.productionBaseURL {
+            apiBaseURL = APIConfiguration.developmentBaseURL
+        }
+        #endif
     }
 
     private func migrateLegacyRecordsToCurrentParentIfNeeded() {
@@ -1166,6 +1548,8 @@ struct AuthTitleView: View {
 }
 
 struct HomeScreen: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let parentName: String
     let profiles: [ChildProfile]
     @Binding var selectedChildID: UUID?
@@ -1174,6 +1558,7 @@ struct HomeScreen: View {
     let onViewInsights: () -> Void
     let onAddLearner: () -> Void
 
+    private var isCompact: Bool { horizontalSizeClass == .compact }
     private var selectedProfile: ChildProfile? { selectedChild(in: profiles, selectedChildID: selectedChildID) }
     private var selectedResults: [ExamResult] { resultsForSelectedChild(results, childID: selectedProfile?.profileID) }
     private var latestResults: [ExamResult] { Array(selectedResults.prefix(3)) }
@@ -1223,7 +1608,7 @@ struct HomeScreen: View {
 
     var body: some View {
         PremiumScrollView {
-            VStack(alignment: .leading, spacing: 64) {
+            VStack(alignment: .leading, spacing: isCompact ? 38 : 64) {
                 if profiles.isEmpty {
                     LSEmptyState(
                         icon: "person.crop.circle.badge.plus",
@@ -1248,7 +1633,7 @@ struct HomeScreen: View {
                     }
 
                     LSTonalPanel {
-                        VStack(alignment: .leading, spacing: 40) {
+                        VStack(alignment: .leading, spacing: isCompact ? 28 : 40) {
                             LSActionHeader(
                                 title: "\(selectedProfile.name)'s Overview",
                                 buttonTitle: "Generate Practice",
@@ -1287,6 +1672,8 @@ struct HomeScreen: View {
 }
 
 struct PracticeScreen: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let profiles: [ChildProfile]
     @Binding var selectedChildID: UUID?
     let exams: [Exam]
@@ -1300,6 +1687,7 @@ struct PracticeScreen: View {
     @State private var selectedExam: Exam?
     @State private var completedResult: ExamResult?
 
+    private var isCompact: Bool { horizontalSizeClass == .compact }
     private var selectedProfile: ChildProfile? { selectedChild(in: profiles, selectedChildID: selectedChildID) }
     private var practicesForChild: [Exam] {
         guard let selectedProfile else { return [] }
@@ -1404,14 +1792,14 @@ struct PracticeScreen: View {
                 }
             } else {
                 PremiumScrollView {
-                    VStack(alignment: .leading, spacing: 56) {
+                    VStack(alignment: .leading, spacing: isCompact ? 34 : 56) {
                         if profiles.isEmpty {
                             LSEmptyState(icon: "person.2.slash", title: "Add a learner first", message: "Create a child profile in Profile before generating practice.")
                         } else {
                             HStack(alignment: .center, spacing: 18) {
                                 LSInitialAvatar(profile: selectedProfile)
                                 Text("\(selectedProfile?.name ?? "Learner")'s Practice Labs")
-                                    .font(.system(size: 44, weight: .bold))
+                                    .font(.system(size: isCompact ? 32 : 44, weight: .bold))
                                     .foregroundStyle(ScholarTheme.onSurface)
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.72)
@@ -1441,9 +1829,14 @@ struct PracticeScreen: View {
 }
 
 struct ProgressScreen: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let profiles: [ChildProfile]
     @Binding var selectedChildID: UUID?
     let results: [ExamResult]
+    @State private var showingPracticeHistory = false
+
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     private var selectedProfile: ChildProfile? { selectedChild(in: profiles, selectedChildID: selectedChildID) }
     private var selectedResults: [ExamResult] { resultsForSelectedChild(results, childID: selectedProfile?.profileID) }
@@ -1481,9 +1874,16 @@ struct ProgressScreen: View {
                     Text("Recent Practice")
                         .font(.title.bold())
                     Spacer()
-                    Text("View All")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ScholarTheme.primary)
+                    Button {
+                        showingPracticeHistory = true
+                    } label: {
+                        Text("View All")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ScholarTheme.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selectedResults.isEmpty)
+                    .opacity(selectedResults.isEmpty ? 0.45 : 1)
                 }
                 if selectedResults.isEmpty {
                     LSEmptyState(icon: "clock.badge.questionmark", title: "No completed practice", message: "Completed sessions will appear here.")
@@ -1499,11 +1899,17 @@ struct ProgressScreen: View {
                 }
             }
         }
+        .sheet(isPresented: $showingPracticeHistory) {
+            NavigationStack {
+                ProgressPracticeHistoryView(results: selectedResults)
+            }
+            .presentationDetents([.large])
+        }
     }
 
     var body: some View {
         PremiumScrollView {
-            VStack(alignment: .leading, spacing: 52) {
+            VStack(alignment: .leading, spacing: isCompact ? 34 : 52) {
                 if profiles.isEmpty {
                     LSEmptyState(icon: "person.2.slash", title: "No learners yet", message: "Create a child profile to begin tracking progress.")
                 } else {
@@ -1551,12 +1957,12 @@ struct ProgressScreen: View {
     private var progressTitle: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("\(selectedProfile?.name ?? "Learner")'s Learning Journey")
-                .font(.system(size: 42, weight: .bold))
+                .font(.system(size: isCompact ? 32 : 42, weight: .bold))
                 .foregroundStyle(ScholarTheme.onSurface)
                 .lineLimit(2)
                 .minimumScaleFactor(0.72)
             Text("Tracking progress and celebrating milestones.")
-                .font(.title3)
+                .font(isCompact ? .subheadline : .title3)
                 .foregroundStyle(ScholarTheme.onSurfaceVariant)
         }
     }
@@ -1573,11 +1979,14 @@ struct ProgressScreen: View {
 }
 
 struct InsightsScreen: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let profiles: [ChildProfile]
     @Binding var selectedChildID: UUID?
     let results: [ExamResult]
     @State private var isGeneratingInsight = false
 
+    private var isCompact: Bool { horizontalSizeClass == .compact }
     private var selectedProfile: ChildProfile? { selectedChild(in: profiles, selectedChildID: selectedChildID) }
     private var selectedResults: [ExamResult] { resultsForSelectedChild(results, childID: selectedProfile?.profileID) }
     private var suggestedPathCard: some View {
@@ -1619,25 +2028,25 @@ struct InsightsScreen: View {
 
     var body: some View {
         PremiumScrollView {
-            VStack(alignment: .leading, spacing: 56) {
+            VStack(alignment: .leading, spacing: isCompact ? 34 : 56) {
                 if profiles.isEmpty {
                     LSEmptyState(icon: "sparkles", title: "No learner selected", message: "Create a child profile to unlock learning insights.")
                 } else if selectedResults.count < 3 {
                     VStack(alignment: .leading, spacing: 28) {
                         Text("Monthly Learning Report")
-                            .font(.system(size: 44, weight: .bold))
+                            .font(.system(size: isCompact ? 32 : 44, weight: .bold))
                             .foregroundStyle(ScholarTheme.primary)
                         LSEmptyState(icon: "chart.bar.doc.horizontal", title: "Generate an AI learning report", message: "Generate an AI learning report to discover strengths, areas needing practice, and personalized recommendations.")
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 22) {
                         Text("Monthly Learning Report")
-                            .font(.system(size: 44, weight: .bold))
+                            .font(.system(size: isCompact ? 32 : 44, weight: .bold))
                             .foregroundStyle(ScholarTheme.primary)
                             .lineLimit(2)
                             .minimumScaleFactor(0.72)
                         Text("Generated for \(selectedProfile?.name ?? "Learner") • \(DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none))")
-                            .font(.title3)
+                            .font(isCompact ? .subheadline : .title3)
                             .foregroundStyle(ScholarTheme.onSurfaceVariant)
                     }
 
@@ -1722,6 +2131,7 @@ struct InsightsScreen: View {
 
 struct ProfileScreen: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     let parentName: String
     let parentEmail: String
@@ -1740,17 +2150,18 @@ struct ProfileScreen: View {
     @State private var editingProfile: ChildProfile?
     @State private var deletingProfile: ChildProfile?
 
+    private var isCompact: Bool { horizontalSizeClass == .compact }
     private var canAddChildProfile: Bool { profiles.count < 5 }
 
     private var planAndChildrenColumn: some View {
-        VStack(spacing: 28) {
+        VStack(spacing: isCompact ? 18 : 28) {
             LSDarkPlanCard(onUpgrade: onUpgrade)
 
             LSCard {
                 VStack(alignment: .leading, spacing: 24) {
                     HStack {
                         Text("Child Profiles")
-                            .font(.title.bold())
+                            .font(isCompact ? .headline.bold() : .title.bold())
                         Spacer()
                         Text("\(profiles.count) of 5 Seats Used")
                             .font(.caption.weight(.semibold))
@@ -1761,7 +2172,13 @@ struct ProfileScreen: View {
                     }
 
                     if profiles.isEmpty {
-                        LSEmptyState(icon: "person.crop.circle.badge.plus", title: "No child profiles", message: "Add your first learner to begin practice.")
+                        VStack(spacing: 16) {
+                            LSEmptyState(icon: "person.crop.circle.badge.plus", title: "No child profiles", message: "Add your first learner to begin practice.")
+                            LSPrimaryButton(title: "Add Child Profile", icon: "plus.circle.fill") {
+                                guard canAddChildProfile else { return }
+                                showingAddProfile = true
+                            }
+                        }
                     } else {
                         LSProfileAvatarStrip(
                             profiles: profiles,
@@ -1785,17 +2202,17 @@ struct ProfileScreen: View {
             LSProfileMenuRow(icon: "chart.line.uptrend.xyaxis", title: "Plan & Usage", subtitle: "Billing cycle and history", tint: ScholarTheme.primary) {
                 onUpgrade()
             }
-            Divider().padding(.leading, 86)
+            Divider().padding(.leading, isCompact ? 72 : 86)
             LSProfileMenuRow(icon: "gearshape", title: "App Settings", subtitle: "Notifications, audio, display", tint: ScholarTheme.onSurfaceVariant) {
                 showingAppSettings = true
             }
-            Divider().padding(.leading, 86)
+            Divider().padding(.leading, isCompact ? 72 : 86)
             LSProfileMenuRow(icon: "questionmark.circle", title: "Support & Help", subtitle: "FAQs and contact", tint: ScholarTheme.onSurfaceVariant) {
                 if let supportURL = URL(string: "https://www.tgdevelops.com/support") {
                     openURL(supportURL)
                 }
             }
-            Divider().padding(.leading, 86)
+            Divider().padding(.leading, isCompact ? 72 : 86)
             LSProfileMenuRow(icon: "rectangle.portrait.and.arrow.right", title: "Logout", subtitle: "", tint: ScholarTheme.error, isDestructive: true, action: onLogout)
         }
         .background(ScholarTheme.cardBackground)
@@ -1808,15 +2225,15 @@ struct ProfileScreen: View {
 
     var body: some View {
         PremiumScrollView {
-            VStack(alignment: .leading, spacing: 48) {
+            VStack(alignment: .leading, spacing: isCompact ? 34 : 48) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("\(parentName.isEmpty ? "Parent" : parentName)'s Account")
-                        .font(.system(size: 44, weight: .bold))
+                        .font(.system(size: isCompact ? 32 : 44, weight: .bold))
                         .foregroundStyle(ScholarTheme.onSurface)
                         .lineLimit(2)
                         .minimumScaleFactor(0.72)
                     Text("Manage your family settings and subscription.")
-                        .font(.title3)
+                        .font(isCompact ? .subheadline : .title3)
                         .foregroundStyle(ScholarTheme.onSurfaceVariant)
                 }
 
@@ -2491,32 +2908,7 @@ struct ExamAttemptView: View {
                     .tint(ScholarTheme.primary)
 
                 VStack(alignment: .leading, spacing: 18) {
-                    Text(currentQuestion.prompt)
-                        .font(.title2.bold())
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if currentQuestion.options.isEmpty {
-                        TextField("Type your answer", text: answerBinding(for: currentQuestion.id))
-                            .textFieldStyle(.roundedBorder)
-                            .font(.title3)
-                            .textInputAutocapitalization(.never)
-                    } else {
-                        ForEach(currentQuestion.options, id: \.self) { option in
-                            Button { answers[currentQuestion.id] = option } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: answers[currentQuestion.id] == option ? "checkmark.circle.fill" : "circle")
-                                        .font(.title2)
-                                    Text(option)
-                                        .font(.title3.bold())
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .multilineTextAlignment(.leading)
-                                }
-                                .padding()
-                                .background(answers[currentQuestion.id] == option ? ScholarTheme.mint.opacity(0.22) : ScholarTheme.controlSurface)
-                                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                    QuestionRenderer(question: currentQuestion, answer: answerBinding(for: currentQuestion.id))
                 }
                 .padding(20)
                 .background(ScholarTheme.surface)
@@ -2541,6 +2933,527 @@ struct ExamAttemptView: View {
             .frame(maxWidth: 860)
             .frame(maxWidth: .infinity)
         }
+    }
+}
+
+struct QuestionRenderer: View {
+    let question: Question
+    @Binding var answer: String
+
+    private var type: String { normalizedQuestionType(question.type) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            if type == "reading_comprehension", let passage = question.passage, !passage.isEmpty {
+                PassageBlock(passage: passage)
+            }
+
+            Text(question.prompt)
+                .font(.title2.bold())
+                .foregroundStyle(ScholarTheme.onSurface)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
+
+            switch type {
+            case "picture_identification", "shape_recognition", "color_recognition", "odd_one_out", "compare_objects", "picture_mcq", "pattern_recognition":
+                VisualChoiceQuestion(question: question, answer: $answer)
+            case "count_and_answer":
+                CountAndAnswerQuestion(question: question, answer: $answer)
+            case "missing_number":
+                ChoiceOrTextQuestion(question: question, answer: $answer, keyboardType: .numberPad)
+            case "simple_match", "match_following":
+                MatchingQuestion(question: question, answer: $answer)
+            case "simple_true_false", "true_false":
+                ChoiceGrid(options: ["True", "False"], selection: $answer, visualStyle: false)
+            case "fill_blank", "short_answer":
+                CompactAnswerField(answer: $answer, placeholder: "Type answer", keyboardType: .default)
+            case "reading_comprehension":
+                if question.options.isEmpty {
+                    CompactAnswerField(answer: $answer, placeholder: "Type answer", keyboardType: .default)
+                } else {
+                    ChoiceGrid(options: question.options, selection: $answer, visualStyle: false)
+                }
+            case "sequence_ordering":
+                SequenceOrderingQuestion(items: question.options.isEmpty ? question.visualElements : question.options, answer: $answer)
+            case "categorization":
+                CategorizationQuestion(question: question, answer: $answer)
+            case "mcq":
+                ChoiceOrTextQuestion(question: question, answer: $answer, keyboardType: .default)
+            default:
+                FallbackQuestion(question: question, answer: $answer)
+            }
+        }
+    }
+}
+
+struct PassageBlock: View {
+    let passage: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Read first", systemImage: "book.pages.fill")
+                .font(.headline)
+                .foregroundStyle(ScholarTheme.primary)
+            Text(passage)
+                .font(.title3)
+                .lineSpacing(4)
+                .foregroundStyle(ScholarTheme.onSurface)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ScholarTheme.primarySoft.opacity(0.45))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+}
+
+struct FallbackQuestion: View {
+    let question: Question
+    @Binding var answer: String
+
+    var body: some View {
+        if !question.options.isEmpty {
+            ChoiceGrid(options: question.options, selection: $answer, visualStyle: false)
+        } else if !question.visualElements.isEmpty {
+            ChoiceGrid(options: question.visualElements, selection: $answer, visualStyle: true)
+        } else {
+            CompactAnswerField(answer: $answer, placeholder: "Type answer", keyboardType: .default)
+        }
+    }
+}
+
+struct ChoiceOrTextQuestion: View {
+    let question: Question
+    @Binding var answer: String
+    var keyboardType: UIKeyboardType
+
+    var body: some View {
+        if question.options.isEmpty {
+            CompactAnswerField(answer: $answer, placeholder: "Type answer", keyboardType: keyboardType)
+        } else {
+            ChoiceGrid(options: question.options, selection: $answer, visualStyle: false)
+        }
+    }
+}
+
+struct VisualChoiceQuestion: View {
+    let question: Question
+    @Binding var answer: String
+
+    private var choices: [String] {
+        if !question.visualElements.isEmpty { return question.visualElements }
+        return question.options
+    }
+
+    var body: some View {
+        if choices.isEmpty {
+            CompactAnswerField(answer: $answer, placeholder: "Type answer", keyboardType: .default)
+        } else {
+            ChoiceGrid(options: choices, selection: $answer, visualStyle: true)
+        }
+    }
+}
+
+struct CountAndAnswerQuestion: View {
+    let question: Question
+    @Binding var answer: String
+
+    private var numberOptions: [String] {
+        if !question.options.isEmpty { return question.options }
+        let maxNumber = normalizedQuestionType(question.type) == "count_and_answer" && question.visualElements.count > 5 ? 10 : 5
+        return (1...maxNumber).map(String.init)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if !question.visualElements.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 12)], spacing: 12) {
+                    ForEach(Array(question.visualElements.enumerated()), id: \.offset) { _, item in
+                        Text(item)
+                            .font(.system(size: 46))
+                            .frame(minWidth: 64, minHeight: 64)
+                            .background(ScholarTheme.controlSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
+                Text("How many?")
+                    .font(.headline)
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+            }
+            ChoiceGrid(options: numberOptions, selection: $answer, visualStyle: false)
+        }
+    }
+}
+
+struct ChoiceGrid: View {
+    let options: [String]
+    @Binding var selection: String
+    var visualStyle: Bool
+
+    private var columns: [GridItem] {
+        [GridItem(.adaptive(minimum: visualStyle ? 96 : 150), spacing: 12)]
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(options, id: \.self) { option in
+                QuestionChoiceButton(option: option, isSelected: selection == option, visualStyle: visualStyle) {
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+                        selection = option
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct QuestionChoiceButton: View {
+    let option: String
+    let isSelected: Bool
+    let visualStyle: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                if visualStyle, let color = colorFromAnswer(option) {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 58, height: 58)
+                        .overlay(Circle().stroke(ScholarTheme.hairline(2), lineWidth: 1))
+                } else {
+                    Text(option)
+                        .font(visualStyle ? .system(size: 42, weight: .bold) : .title3.bold())
+                        .minimumScaleFactor(0.72)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(ScholarTheme.onSurface)
+                }
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.headline)
+                        .foregroundStyle(ScholarTheme.primary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: visualStyle ? 96 : 60)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(isSelected ? ScholarTheme.primarySoft.opacity(0.85) : ScholarTheme.controlSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(isSelected ? ScholarTheme.primary : ScholarTheme.hairline(), lineWidth: isSelected ? 2 : 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(option)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+}
+
+struct CompactAnswerField: View {
+    @Binding var answer: String
+    let placeholder: String
+    let keyboardType: UIKeyboardType
+
+    var body: some View {
+        TextField(placeholder, text: $answer)
+            .textFieldStyle(.plain)
+            .font(.title3.weight(.semibold))
+            .keyboardType(keyboardType)
+            .textInputAutocapitalization(.never)
+            .padding(16)
+            .frame(minHeight: 56)
+            .background(ScholarTheme.controlSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(ScholarTheme.hairline(), lineWidth: 1)
+            )
+    }
+}
+
+struct MatchingQuestion: View {
+    let question: Question
+    @Binding var answer: String
+
+    @State private var selectedLeft: String?
+    @State private var pairs: [String: String] = [:]
+
+    var body: some View {
+        if question.leftItems.isEmpty || question.rightItems.isEmpty {
+            UnsupportedQuestionFallback(message: "This matching question is missing one of its columns.")
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 14) {
+                    matchingColumn(title: "Match", items: question.leftItems, isLeft: true)
+                    matchingColumn(title: "With", items: question.rightItems, isLeft: false)
+                }
+
+                if !pairs.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Your matches")
+                            .font(.headline)
+                            .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                        ForEach(question.leftItems.filter { pairs[$0] != nil }, id: \.self) { left in
+                            HStack {
+                                Text(left)
+                                Image(systemName: "arrow.right")
+                                    .foregroundStyle(ScholarTheme.primary)
+                                Text(pairs[left] ?? "")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ScholarTheme.onSurface)
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ScholarTheme.controlSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+            }
+            .onAppear { pairs = decodedStringMap(answer) ?? [:] }
+        }
+    }
+
+    private func matchingColumn(title: String, items: [String], isLeft: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(ScholarTheme.onSurfaceVariant)
+            ForEach(items, id: \.self) { item in
+                Button {
+                    handleTap(item, isLeft: isLeft)
+                } label: {
+                    HStack {
+                        Text(item)
+                            .font(.headline)
+                            .foregroundStyle(ScholarTheme.onSurface)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if isLeft, selectedLeft == item {
+                            Image(systemName: "hand.point.up.left.fill")
+                                .foregroundStyle(ScholarTheme.primary)
+                        } else if isLeft, pairs[item] != nil {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(ScholarTheme.primary)
+                        } else if !isLeft, pairs.values.contains(item) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(ScholarTheme.primary)
+                        }
+                    }
+                    .padding(14)
+                    .frame(minHeight: 54)
+                    .background(itemIsActive(item, isLeft: isLeft) ? ScholarTheme.primarySoft.opacity(0.85) : ScholarTheme.controlSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func itemIsActive(_ item: String, isLeft: Bool) -> Bool {
+        if isLeft { return selectedLeft == item || pairs[item] != nil }
+        return pairs.values.contains(item)
+    }
+
+    private func handleTap(_ item: String, isLeft: Bool) {
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
+            if isLeft {
+                selectedLeft = item
+            } else if let left = selectedLeft {
+                pairs[left] = item
+                selectedLeft = nil
+                answer = encodedStringMap(pairs)
+            }
+        }
+    }
+}
+
+struct SequenceOrderingQuestion: View {
+    let items: [String]
+    @Binding var answer: String
+
+    @State private var orderedItems: [String] = []
+
+    private var remainingItems: [String] {
+        items.filter { !orderedItems.contains($0) }
+    }
+
+    var body: some View {
+        if items.isEmpty {
+            UnsupportedQuestionFallback(message: "This ordering question is missing items.")
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Tap each item in the right order.")
+                    .font(.headline)
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                FlowChips(items: orderedItems, selectedItems: Set(orderedItems), emptyText: "Your order will appear here") { item in
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
+                        orderedItems.removeAll { $0 == item }
+                        answer = encodedStringArray(orderedItems)
+                    }
+                }
+                FlowChips(items: remainingItems, selectedItems: []) { item in
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
+                        orderedItems.append(item)
+                        answer = encodedStringArray(orderedItems)
+                    }
+                }
+            }
+            .onAppear { orderedItems = decodedStringArray(answer) ?? [] }
+        }
+    }
+}
+
+struct CategorizationQuestion: View {
+    let question: Question
+    @Binding var answer: String
+
+    @State private var selectedItem: String?
+    @State private var buckets: [String: [String]] = [:]
+
+    private var items: [String] {
+        question.visualElements.isEmpty ? question.options : question.visualElements
+    }
+
+    private var unassignedItems: [String] {
+        let assigned = Set(buckets.values.flatMap { $0 })
+        return items.filter { !assigned.contains($0) }
+    }
+
+    var body: some View {
+        if question.categories.isEmpty || items.isEmpty {
+            UnsupportedQuestionFallback(message: "This sorting question is missing categories or items.")
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Tap an item, then tap where it belongs.")
+                    .font(.headline)
+                    .foregroundStyle(ScholarTheme.onSurfaceVariant)
+
+                FlowChips(items: unassignedItems, selectedItems: selectedItem.map { Set([$0]) } ?? []) { item in
+                    selectedItem = item
+                }
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+                    ForEach(question.categories, id: \.self) { category in
+                        Button {
+                            assignSelectedItem(to: category)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(category)
+                                    .font(.headline)
+                                    .foregroundStyle(ScholarTheme.primary)
+                                let categoryItems = buckets[category, default: []]
+                                if categoryItems.isEmpty {
+                                    Text("Drop here")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                                } else {
+                                    ForEach(categoryItems, id: \.self) { item in
+                                        Text(item)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(ScholarTheme.onSurface)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 8)
+                                            .background(ScholarTheme.primarySoft.opacity(0.7))
+                                            .clipShape(Capsule())
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
+                            .padding(14)
+                            .background(ScholarTheme.controlSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .onAppear {
+                buckets = decodedStringArrayMap(answer) ?? Dictionary(uniqueKeysWithValues: question.categories.map { ($0, []) })
+            }
+        }
+    }
+
+    private func assignSelectedItem(to category: String) {
+        guard let selectedItem else { return }
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
+            for key in buckets.keys {
+                buckets[key]?.removeAll { $0 == selectedItem }
+            }
+            buckets[category, default: []].append(selectedItem)
+            self.selectedItem = nil
+            answer = encodedStringArrayMap(buckets)
+        }
+    }
+}
+
+struct FlowChips: View {
+    let items: [String]
+    var selectedItems: Set<String> = []
+    var emptyText: String = "No items left"
+    let onTap: (String) -> Void
+
+    var body: some View {
+        if items.isEmpty {
+            Text(emptyText)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ScholarTheme.onSurfaceVariant)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ScholarTheme.controlSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        } else {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 10)], spacing: 10) {
+                ForEach(items, id: \.self) { item in
+                    Button { onTap(item) } label: {
+                        Text(item)
+                            .font(.headline)
+                            .foregroundStyle(ScholarTheme.onSurface)
+                            .minimumScaleFactor(0.75)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 50)
+                            .padding(.horizontal, 12)
+                            .background(selectedItems.contains(item) ? ScholarTheme.primarySoft.opacity(0.85) : ScholarTheme.controlSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+}
+
+struct UnsupportedQuestionFallback: View {
+    let message: String
+
+    var body: some View {
+        Label(message, systemImage: "questionmark.square.dashed")
+            .font(.headline)
+            .foregroundStyle(ScholarTheme.onSurfaceVariant)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(ScholarTheme.controlSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+func colorFromAnswer(_ value: String) -> Color? {
+    switch normalizedAnswerString(value) {
+    case "red": .red
+    case "blue": .blue
+    case "green": .green
+    case "yellow": .yellow
+    case "orange": .orange
+    case "purple": .purple
+    case "pink": .pink
+    case "black": .black
+    case "white": .white
+    case "brown": Color(red: 0.48, green: 0.28, blue: 0.14)
+    case "gray", "grey": .gray
+    default: nil
     }
 }
 
@@ -2648,8 +3561,8 @@ struct QuestionReviewList: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(item.isCorrect ? "Correct" : "Needs Practice", systemImage: item.isCorrect ? "checkmark.seal.fill" : "xmark.seal.fill").font(.headline).foregroundStyle(item.isCorrect ? ScholarTheme.mint : ScholarTheme.coral)
                     Text(item.question.prompt).font(.headline)
-                    Text("Your answer: \(item.selectedAnswer)").foregroundStyle(item.isCorrect ? ScholarTheme.mint : ScholarTheme.coral)
-                    if !item.isCorrect { Text("Correct answer: \(item.question.correctAnswer)") }
+                    Text("Your answer: \(displayStoredAnswer(item.selectedAnswer))").foregroundStyle(item.isCorrect ? ScholarTheme.mint : ScholarTheme.coral)
+                    if !item.isCorrect { Text("Correct answer: \(displayStoredAnswer(item.question.correctAnswer))") }
                     Text(item.question.explanation).font(.subheadline).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading).padding().background(ScholarTheme.surface).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
@@ -2943,13 +3856,14 @@ func row(icon: String, title: String, subtitle: String, color: Color) -> some Vi
 struct PremiumScrollView<Content: View>: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ViewBuilder var content: () -> Content
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         ScrollView {
             content()
-                .padding(.horizontal, horizontalSizeClass == .compact ? 20 : 48)
-                .padding(.top, horizontalSizeClass == .compact ? 26 : 44)
-                .padding(.bottom, 132)
+                .padding(.horizontal, isCompact ? 16 : 48)
+                .padding(.top, isCompact ? 20 : 44)
+                .padding(.bottom, isCompact ? 108 : 132)
                 .adaptiveContentWidth(maxWidth: 1100)
         }
         .background(LSBackground())
@@ -2963,18 +3877,12 @@ struct LSTopAppBar: View {
 
     var body: some View {
         HStack(spacing: isCompact ? 12 : 28) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("Little Scholar")
-                    .font(.system(size: isCompact ? 26 : 34, weight: .bold))
+                    .font(.system(size: isCompact ? 30 : 44, weight: .bold))
                     .foregroundStyle(ScholarTheme.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-
-                if isCompact {
-                    Text("Exam Buddy")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ScholarTheme.onSurfaceVariant)
-                }
             }
 
             Spacer(minLength: 18)
@@ -2988,14 +3896,14 @@ struct LSTopAppBar: View {
             }
 
             Image(systemName: "person.crop.circle")
-                .font(.system(size: 28, weight: .semibold))
+                .font(.system(size: isCompact ? 22 : 28, weight: .semibold))
                 .foregroundStyle(ScholarTheme.primary)
-                .frame(width: 44, height: 44)
+                .frame(width: isCompact ? 40 : 44, height: isCompact ? 40 : 44)
                 .background(ScholarTheme.controlSurface)
                 .clipShape(Circle())
         }
-        .padding(.horizontal, isCompact ? 20 : 48)
-        .frame(maxWidth: 1100, minHeight: 80)
+        .padding(.horizontal, isCompact ? 16 : 48)
+        .frame(maxWidth: 1100, minHeight: isCompact ? 64 : 88)
         .frame(maxWidth: .infinity)
         .background(ScholarTheme.surface.opacity(0.92))
         .accessibilityElement(children: .combine)
@@ -3017,12 +3925,13 @@ struct LSTopAppBar: View {
 struct LSTonalPanel<Content: View>: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ViewBuilder var content: () -> Content
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         content()
-            .padding(horizontalSizeClass == .compact ? 24 : 48)
+            .padding(isCompact ? 18 : 48)
             .background(ScholarTheme.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: isCompact ? 22 : 28, style: .continuous))
     }
 }
 
@@ -3051,10 +3960,13 @@ struct LSResponsiveColumns<Leading: View, Trailing: View>: View {
 }
 
 struct LSActionHeader: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let title: String
     let buttonTitle: String
     let buttonIcon: String
     let action: () -> Void
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -3073,7 +3985,7 @@ struct LSActionHeader: View {
 
     private var titleText: some View {
         Text(title)
-            .font(.system(size: 44, weight: .bold))
+            .font(.system(size: isCompact ? 32 : 44, weight: .bold))
             .foregroundStyle(ScholarTheme.onSurface)
             .minimumScaleFactor(0.72)
             .lineLimit(2)
@@ -3084,8 +3996,8 @@ struct LSActionHeader: View {
             Label(buttonTitle, systemImage: buttonIcon)
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 30)
-                .frame(minHeight: 58)
+                .padding(.horizontal, isCompact ? 22 : 30)
+                .frame(minHeight: isCompact ? 50 : 58)
                 .background(ScholarTheme.primary)
                 .clipShape(Capsule())
         }
@@ -3094,9 +4006,12 @@ struct LSActionHeader: View {
 }
 
 struct PremiumHeader: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let eyebrow: String
     let title: String
     let subtitle: String
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -3108,13 +4023,13 @@ struct PremiumHeader: View {
                     .tracking(0.8)
             }
             Text(title)
-                .font(.largeTitle.bold())
+                .font((isCompact ? Font.title.bold() : Font.largeTitle.bold()))
                 .foregroundStyle(ScholarTheme.primaryText)
                 .lineLimit(2)
                 .minimumScaleFactor(0.72)
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.headline)
+                    .font(isCompact ? .subheadline.weight(.medium) : .headline)
                     .foregroundStyle(ScholarTheme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -3144,57 +4059,64 @@ struct LSBackground: View {
 }
 
 struct LSCard<Content: View>: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ViewBuilder var content: () -> Content
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(26)
+            .padding(isCompact ? 18 : 26)
             .background(ScholarTheme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: isCompact ? 20 : 26, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                RoundedRectangle(cornerRadius: isCompact ? 20 : 26, style: .continuous)
                     .stroke(ScholarTheme.hairline(0.9), lineWidth: 1)
             }
-            .shadow(color: ScholarTheme.shadow, radius: 16, x: 0, y: 8)
+            .shadow(color: ScholarTheme.shadow, radius: isCompact ? 10 : 16, x: 0, y: isCompact ? 5 : 8)
     }
 }
 
 struct LSHeroCard<Content: View>: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ViewBuilder var content: () -> Content
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(30)
+            .padding(isCompact ? 22 : 30)
             .background(ScholarTheme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: isCompact ? 22 : 30, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                RoundedRectangle(cornerRadius: isCompact ? 22 : 30, style: .continuous)
                     .stroke(ScholarTheme.primary.opacity(0.08), lineWidth: 1)
             }
-            .shadow(color: ScholarTheme.shadow, radius: 18, x: 0, y: 10)
+            .shadow(color: ScholarTheme.shadow, radius: isCompact ? 12 : 18, x: 0, y: isCompact ? 6 : 10)
     }
 }
 
 struct LSSectionHeader: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let title: String
     let subtitle: String
     let icon: String
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: isCompact ? 10 : 12) {
             Image(systemName: icon)
-                .font(.headline.weight(.bold))
+                .font((isCompact ? Font.subheadline.weight(.bold) : Font.headline.weight(.bold)))
                 .foregroundStyle(ScholarTheme.primary)
-                .frame(width: 36, height: 36)
+                .frame(width: isCompact ? 32 : 36, height: isCompact ? 32 : 36)
                 .background(ScholarTheme.primary.opacity(0.09))
                 .clipShape(Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.title2.bold())
+                    .font(isCompact ? .headline.bold() : .title2.bold())
                 Text(subtitle)
-                    .font(.subheadline.weight(.medium))
+                    .font(isCompact ? .caption.weight(.medium) : .subheadline.weight(.medium))
                     .foregroundStyle(ScholarTheme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -3205,21 +4127,24 @@ struct LSSectionHeader: View {
 }
 
 struct LSStatCard: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let title: String
     let value: String
     let icon: String
     let color: Color
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Image(systemName: icon)
-                .font(.headline.weight(.bold))
+                .font(isCompact ? .subheadline.weight(.bold) : .headline.weight(.bold))
                 .foregroundStyle(color)
-                .frame(width: 34, height: 34)
+                .frame(width: isCompact ? 30 : 34, height: isCompact ? 30 : 34)
                 .background(color.opacity(0.09))
                 .clipShape(Circle())
             Text(value)
-                .font(.title.bold())
+                .font(isCompact ? .title3.bold() : .title.bold())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(title)
@@ -3227,8 +4152,8 @@ struct LSStatCard: View {
                 .foregroundStyle(ScholarTheme.secondaryText)
                 .lineLimit(2)
         }
-        .frame(maxWidth: .infinity, minHeight: 116, alignment: .leading)
-        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : 116, alignment: .leading)
+        .padding(isCompact ? 14 : 18)
         .background(ScholarTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
@@ -3240,15 +4165,18 @@ struct LSStatCard: View {
 }
 
 struct LSMetricTile: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let title: String
     let value: String
     let detail: String
     let icon: String
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: isCompact ? 14 : 22) {
             Label(title, systemImage: icon)
-                .font(.headline)
+                .font(isCompact ? .subheadline.weight(.semibold) : .headline)
                 .foregroundStyle(ScholarTheme.onSurface)
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .lastTextBaseline, spacing: 10) {
@@ -3261,8 +4189,8 @@ struct LSMetricTile: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 138, alignment: .leading)
-        .padding(24)
+        .frame(maxWidth: .infinity, minHeight: isCompact ? 112 : 138, alignment: .leading)
+        .padding(isCompact ? 18 : 24)
         .background(ScholarTheme.cardBackground.opacity(0.88))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
@@ -3275,7 +4203,7 @@ struct LSMetricTile: View {
 
     private var metricValue: some View {
         Text(value)
-            .font(.system(size: 36, weight: .bold))
+            .font(.system(size: isCompact ? 28 : 36, weight: .bold))
             .foregroundStyle(ScholarTheme.onSurface)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
@@ -3283,15 +4211,18 @@ struct LSMetricTile: View {
 
     private var detailText: some View {
         Text(detail)
-            .font(.subheadline)
+            .font(isCompact ? .caption.weight(.medium) : .subheadline)
             .foregroundStyle(ScholarTheme.onSurfaceVariant)
             .lineLimit(2)
     }
 }
 
 struct LSQuestionCountButton: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let count: Int
     @Binding var selectedCount: Int
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         Button {
@@ -3300,9 +4231,9 @@ struct LSQuestionCountButton: View {
             }
         } label: {
             Text("\(count) Qs")
-                .font(.title3.weight(.medium))
+                .font(isCompact ? .subheadline.weight(.semibold) : .title3.weight(.medium))
                 .foregroundStyle(selectedCount == count ? Color.white : ScholarTheme.onSurfaceVariant)
-                .frame(maxWidth: .infinity, minHeight: 62)
+                .frame(maxWidth: .infinity, minHeight: isCompact ? 48 : 62)
                 .background(selectedCount == count ? ScholarTheme.primary : ScholarTheme.inputSurface)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
@@ -3426,13 +4357,15 @@ struct LSGradeSelector: View {
 }
 
 struct LSInitialAvatar: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let profile: ChildProfile?
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         Text(initial)
-            .font(.system(size: 30, weight: .semibold))
+            .font(.system(size: isCompact ? 22 : 30, weight: .semibold))
             .foregroundStyle(ScholarTheme.primary)
-            .frame(width: 66, height: 66)
+            .frame(width: isCompact ? 50 : 66, height: isCompact ? 50 : 66)
             .background(ScholarTheme.secondaryContainer)
             .clipShape(Circle())
             .overlay {
@@ -3484,10 +4417,12 @@ struct LSSecondaryButton: View {
 }
 
 struct LSBottomTabBar: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Binding var selectedMode: AppMode
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: isCompact ? 2 : 6) {
             ForEach(AppMode.allCases) { mode in
                 Button {
                     withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
@@ -3496,16 +4431,16 @@ struct LSBottomTabBar: View {
                 } label: {
                     VStack(spacing: 5) {
                         Image(systemName: mode.icon)
-                            .font(.headline.weight(.bold))
+                            .font(isCompact ? .subheadline.weight(.bold) : .headline.weight(.bold))
                         Text(mode.rawValue)
-                            .font(.caption2.bold())
+                            .font(isCompact ? .caption2.weight(.semibold) : .caption2.bold())
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
                         Capsule()
                             .fill(selectedMode == mode ? ScholarTheme.primary : Color.clear)
                             .frame(width: 18, height: 3)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 62)
+                    .frame(maxWidth: .infinity, minHeight: isCompact ? 54 : 62)
                     .foregroundStyle(selectedMode == mode ? ScholarTheme.primary : ScholarTheme.secondaryText)
                     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
@@ -3514,12 +4449,12 @@ struct LSBottomTabBar: View {
                 .accessibilityValue(selectedMode == mode ? "Selected" : "")
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, isCompact ? 6 : 10)
+        .padding(.vertical, isCompact ? 6 : 8)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: isCompact ? 24 : 30, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: isCompact ? 24 : 30, style: .continuous)
                 .stroke(ScholarTheme.hairline(1.4), lineWidth: 1)
         }
         .shadow(color: ScholarTheme.shadow, radius: 16, y: 8)
@@ -3528,29 +4463,32 @@ struct LSBottomTabBar: View {
 }
 
 struct LSEmptyState: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let icon: String
     let title: String
     let message: String
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: isCompact ? 10 : 14) {
             Image(systemName: icon)
-                .font(.system(size: 42, weight: .semibold))
+                .font(.system(size: isCompact ? 30 : 42, weight: .semibold))
                 .foregroundStyle(ScholarTheme.primary)
-                .frame(width: 76, height: 76)
+                .frame(width: isCompact ? 58 : 76, height: isCompact ? 58 : 76)
                 .background(ScholarTheme.primary.opacity(0.08))
                 .clipShape(Circle())
             Text(title)
-                .font(.title2.bold())
+                .font(isCompact ? .headline.bold() : .title2.bold())
                 .multilineTextAlignment(.center)
             Text(message)
-                .font(.headline)
+                .font(isCompact ? .subheadline : .headline)
                 .foregroundStyle(ScholarTheme.secondaryText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
-        .padding(26)
+        .padding(isCompact ? 18 : 26)
         .background(ScholarTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .accessibilityElement(children: .combine)
@@ -3558,17 +4496,20 @@ struct LSEmptyState: View {
 }
 
 struct LSSkeletonLoadingCard: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let title: String
     let message: String
     @State private var pulse = false
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Label(title, systemImage: "sparkles")
-                .font(.title3.bold())
+                .font(isCompact ? .headline.bold() : .title3.bold())
                 .foregroundStyle(ScholarTheme.primary)
             Text(message)
-                .font(.headline)
+                .font(isCompact ? .subheadline : .headline)
                 .foregroundStyle(ScholarTheme.secondaryText)
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(ScholarTheme.primarySoft.opacity(pulse ? 0.46 : 0.18))
@@ -3577,7 +4518,7 @@ struct LSSkeletonLoadingCard: View {
                 .fill(ScholarTheme.primary.opacity(pulse ? 0.16 : 0.06))
                 .frame(width: 180, height: 12)
         }
-        .padding(18)
+        .padding(isCompact ? 14 : 18)
         .background(ScholarTheme.controlSurface)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .onAppear { pulse = true }
@@ -3587,15 +4528,18 @@ struct LSSkeletonLoadingCard: View {
 }
 
 struct LSChildCarousel: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let profiles: [ChildProfile]
     @Binding var selectedChildID: UUID?
     let results: [ExamResult]
     var includesAddLearner = false
     var onAddLearner: (() -> Void)?
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 34) {
+            HStack(alignment: .top, spacing: isCompact ? 20 : 34) {
                 ForEach(profiles) { profile in
                     LSLearnerBubble(
                         profile: profile,
@@ -3612,9 +4556,9 @@ struct LSChildCarousel: View {
                     } label: {
                         VStack(spacing: 12) {
                             Image(systemName: "plus")
-                                .font(.title2.weight(.medium))
+                                .font((isCompact ? Font.headline.weight(.medium) : Font.title2.weight(.medium)))
                                 .foregroundStyle(ScholarTheme.primary)
-                                .frame(width: 64, height: 64)
+                                .frame(width: isCompact ? 52 : 64, height: isCompact ? 52 : 64)
                                 .background(ScholarTheme.controlSurface)
                                 .clipShape(Circle())
                                 .overlay {
@@ -3622,10 +4566,10 @@ struct LSChildCarousel: View {
                                         .stroke(ScholarTheme.outlineVariant, style: StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
                                 }
                             Text("Add Learner")
-                                .font(.headline)
+                                .font(isCompact ? .caption.weight(.semibold) : .headline)
                                 .foregroundStyle(ScholarTheme.onSurfaceVariant)
                         }
-                        .frame(width: 112)
+                        .frame(width: isCompact ? 88 : 112)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Add learner")
@@ -3637,27 +4581,30 @@ struct LSChildCarousel: View {
 }
 
 struct LSLearnerBubble: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let profile: ChildProfile
     let isSelected: Bool
     let action: () -> Void
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 12) {
-                ChildProfilePhotoBadge(avatarValue: profile.avatar, isSelected: isSelected, size: 68)
+            VStack(spacing: isCompact ? 8 : 12) {
+                ChildProfilePhotoBadge(avatarValue: profile.avatar, isSelected: isSelected, size: isCompact ? 54 : 68)
                 VStack(spacing: 4) {
                     Text(profile.name)
-                        .font(.headline)
+                        .font(isCompact ? .subheadline.weight(.semibold) : .headline)
                         .foregroundStyle(ScholarTheme.onSurface)
                         .lineLimit(1)
                     Text("\(profile.grade) • Age \(profile.age)")
-                        .font(.caption.weight(.medium))
+                        .font(isCompact ? .caption2.weight(.medium) : .caption.weight(.medium))
                         .foregroundStyle(ScholarTheme.onSurfaceVariant)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
             }
-            .frame(width: 120)
+            .frame(width: isCompact ? 94 : 120)
             .opacity(isSelected ? 1 : 0.58)
         }
         .buttonStyle(.plain)
@@ -3710,24 +4657,27 @@ struct LSChildProfileCard: View {
 }
 
 struct AIRecommendationCard: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let results: [ExamResult]
     let onViewInsights: () -> Void
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         LSCard {
             ZStack(alignment: .trailing) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 110, weight: .light))
+                    .font(.system(size: isCompact ? 68 : 110, weight: .light))
                     .foregroundStyle(ScholarTheme.surfaceVariant.opacity(0.75))
                     .padding(.trailing, 12)
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: isCompact ? 14 : 20) {
                     Label("AI Insight", systemImage: "sparkles")
                         .font(.caption.weight(.semibold))
                         .textCase(.uppercase)
                         .tracking(2)
                         .foregroundStyle(ScholarTheme.primary)
                     Text(recommendation)
-                        .font(.title3)
+                        .font(isCompact ? .body : .title3)
                         .lineSpacing(4)
                         .foregroundStyle(ScholarTheme.onSurface)
                         .fixedSize(horizontal: false, vertical: true)
@@ -3751,16 +4701,19 @@ struct AIRecommendationCard: View {
 }
 
 struct PremiumPracticeRow: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let exam: Exam
     let onStart: () -> Void
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: isCompact ? 18 : 24) {
             HStack(alignment: .top) {
                 Image(systemName: subjectIcon)
-                    .font(.title2.weight(.semibold))
+                    .font(isCompact ? .headline.weight(.semibold) : .title2.weight(.semibold))
                     .foregroundStyle(ScholarTheme.primary)
-                    .frame(width: 52, height: 52)
+                    .frame(width: isCompact ? 44 : 52, height: isCompact ? 44 : 52)
                     .background(ScholarTheme.secondaryContainer.opacity(0.72))
                     .clipShape(Circle())
                 Spacer()
@@ -3774,10 +4727,10 @@ struct PremiumPracticeRow: View {
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text(exam.subject)
-                    .font(.title2.bold())
+                    .font(isCompact ? .headline.bold() : .title2.bold())
                     .foregroundStyle(ScholarTheme.onSurface)
                 Text("\(exam.difficulty) • \(exam.questions.count) Questions")
-                    .font(.headline)
+                    .font(isCompact ? .subheadline.weight(.medium) : .headline)
                     .foregroundStyle(ScholarTheme.onSurfaceVariant)
             }
             Button(action: onStart) {
@@ -3790,7 +4743,7 @@ struct PremiumPracticeRow: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(24)
+        .padding(isCompact ? 18 : 24)
         .background(ScholarTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
@@ -3875,14 +4828,19 @@ struct SubjectProgressList: View {
 
 struct PerformanceTrendView: View {
     let results: [ExamResult]
+    private let requiredSessions = 5
 
     private var recentResults: [ExamResult] {
         Array(results.prefix(8).reversed())
     }
 
     var body: some View {
-        if recentResults.isEmpty {
-            LSEmptyState(icon: "chart.line.uptrend.xyaxis", title: "No completed practice", message: "Recent progress will appear after your child completes practice.")
+        if results.count < requiredSessions {
+            LSEmptyState(
+                icon: "chart.line.uptrend.xyaxis",
+                title: "Keep practicing to unlock trend analysis.",
+                message: "You need 5 completed sessions."
+            )
         } else {
             GeometryReader { proxy in
                 let points = trendPoints(in: proxy.size)
@@ -3960,36 +4918,114 @@ struct FocusAreasCard: View {
             VStack(alignment: .leading, spacing: 24) {
                 Text("Focus Areas")
                     .font(.title.bold())
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Strong Areas", systemImage: "star")
-                            .font(.caption.weight(.semibold))
-                            .textCase(.uppercase)
-                            .foregroundStyle(ScholarTheme.primary)
-                        FocusPill(icon: "books.vertical", title: strongAreaTitle)
-                        FocusPill(icon: "book", title: "Reading Comprehension")
-                    }
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Needs Practice", systemImage: "brain.head.profile")
-                            .font(.caption.weight(.semibold))
-                            .textCase(.uppercase)
-                            .foregroundStyle(ScholarTheme.tertiary)
-                        FocusPill(icon: "pencil", title: needsPracticeTitle, tint: ScholarTheme.tertiary)
-                        FocusPill(icon: "minus.plus.batteryblock", title: "Subtraction Borrowing", tint: ScholarTheme.tertiary)
+
+                if results.isEmpty {
+                    LSEmptyState(icon: "target", title: "No focus areas yet", message: "Focus areas will appear after completed practice.")
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 16)], alignment: .leading, spacing: 16) {
+                        FocusAreaColumn(
+                            title: "Strong Areas",
+                            icon: "star",
+                            tint: ScholarTheme.primary,
+                            items: strongFocusItems,
+                            emptyTitle: "Strengths are emerging"
+                        )
+                        FocusAreaColumn(
+                            title: "Needs Practice",
+                            icon: "target",
+                            tint: ScholarTheme.tertiary,
+                            items: needsPracticeItems,
+                            emptyTitle: "No missed topics yet"
+                        )
                     }
                 }
             }
         }
     }
 
-    private var strongAreaTitle: String {
-        guard let best = subjectSummaries(results).max(by: { $0.average < $1.average }) else { return "Complete practice" }
-        return "\(best.subject) Confidence"
+    private var strongFocusItems: [FocusAreaItem] {
+        let topicItems = topicFocusItems(matching: \.isCorrect, tint: ScholarTheme.primary, fallbackIcon: "checkmark.seal")
+        if !topicItems.isEmpty { return topicItems }
+
+        let subjectItems = subjectSummaries(results)
+            .filter { $0.average >= 70 }
+            .sorted { $0.average > $1.average }
+            .prefix(2)
+            .map { FocusAreaItem(title: "\($0.subject) Confidence", icon: "books.vertical", tint: ScholarTheme.primary) }
+        if !subjectItems.isEmpty { return Array(subjectItems) }
+
+        guard let best = subjectSummaries(results).max(by: { $0.average < $1.average }) else { return [] }
+        return [FocusAreaItem(title: "\(best.subject) Practice Started", icon: "sparkles", tint: ScholarTheme.primary)]
     }
 
-    private var needsPracticeTitle: String {
-        guard let weakest = subjectSummaries(results).min(by: { $0.average < $1.average }) else { return "Complete practice" }
-        return "\(weakest.subject) Review"
+    private var needsPracticeItems: [FocusAreaItem] {
+        let topicItems = topicFocusItems(matching: { !$0.isCorrect }, tint: ScholarTheme.tertiary, fallbackIcon: "pencil")
+        if !topicItems.isEmpty { return topicItems }
+
+        return subjectSummaries(results)
+            .filter { $0.average < 75 }
+            .sorted { $0.average < $1.average }
+            .prefix(2)
+            .map { FocusAreaItem(title: "\($0.subject) Review", icon: "pencil", tint: ScholarTheme.tertiary) }
+    }
+
+    private func topicFocusItems(matching predicate: (AnswerEvaluation) -> Bool, tint: Color, fallbackIcon: String) -> [FocusAreaItem] {
+        var counts: [String: Int] = [:]
+        for evaluation in results.flatMap(\.evaluations) where predicate(evaluation) {
+            let topic = normalizedFocusTopic(evaluation.question.topic)
+            guard !topic.isEmpty else { continue }
+            counts[topic, default: 0] += 1
+        }
+
+        return counts
+            .sorted {
+                if $0.value == $1.value { return $0.key < $1.key }
+                return $0.value > $1.value
+            }
+            .prefix(2)
+            .map { FocusAreaItem(title: $0.key, icon: fallbackIcon, tint: tint) }
+    }
+
+    private func normalizedFocusTopic(_ topic: String) -> String {
+        let trimmed = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.caseInsensitiveCompare("General") != .orderedSame else { return "" }
+        return trimmed
+    }
+}
+
+struct FocusAreaItem: Identifiable {
+    let id = UUID()
+    let title: String
+    let icon: String
+    let tint: Color
+}
+
+struct FocusAreaColumn: View {
+    let title: String
+    let icon: String
+    let tint: Color
+    let items: [FocusAreaItem]
+    let emptyTitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            if items.isEmpty {
+                FocusPill(icon: "checkmark.circle", title: emptyTitle, tint: tint)
+                    .opacity(0.72)
+            } else {
+                ForEach(items) { item in
+                    FocusPill(icon: item.icon, title: item.title, tint: item.tint)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
@@ -3999,17 +5035,74 @@ struct FocusPill: View {
     var tint: Color = ScholarTheme.primary
 
     var body: some View {
-        Label(title, systemImage: icon)
-            .font(.headline)
-            .foregroundStyle(ScholarTheme.onSurface)
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(tint.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(ScholarTheme.outlineVariant.opacity(0.55), lineWidth: 1)
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: icon)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 24)
+            Text(title)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(ScholarTheme.onSurface)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        .background(tint.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(ScholarTheme.outlineVariant.opacity(0.55), lineWidth: 1)
+        }
+    }
+}
+
+struct ProgressPracticeHistoryView: View {
+    @Environment(\.dismiss) private var dismiss
+    let results: [ExamResult]
+
+    var body: some View {
+        PremiumScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                HStack(alignment: .top) {
+                    PremiumHeader(
+                        eyebrow: "Progress",
+                        title: "Practice History",
+                        subtitle: "\(results.count) completed \(results.count == 1 ? "session" : "sessions")"
+                    )
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(ScholarTheme.onSurface)
+                            .frame(width: 44, height: 44)
+                            .background(ScholarTheme.controlSurface)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close practice history")
+                }
+
+                if results.isEmpty {
+                    LSEmptyState(icon: "clock.badge.questionmark", title: "No completed practice", message: "Completed sessions will appear here.")
+                } else {
+                    LSCard {
+                        VStack(spacing: 0) {
+                            ForEach(results) { result in
+                                NavigationLink { ResultView(result: result) } label: {
+                                    LSRecentExamLine(result: result)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
             }
+        }
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 
@@ -4149,10 +5242,13 @@ struct LSPacingLevelView: View {
 }
 
 struct LSDarkPlanCard: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let onUpgrade: () -> Void
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 34) {
+        VStack(alignment: .leading, spacing: isCompact ? 24 : 34) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Current Plan")
@@ -4161,16 +5257,16 @@ struct LSDarkPlanCard: View {
                         .tracking(2)
                         .foregroundStyle(.white.opacity(0.72))
                     Text("Little Scholar Plus")
-                        .font(.system(size: 34, weight: .bold))
+                        .font(.system(size: isCompact ? 26 : 34, weight: .bold))
                         .foregroundStyle(ScholarTheme.cardBackground)
                 }
                 Spacer()
                 Image(systemName: "star.circle.fill")
-                    .font(.system(size: 40))
+                    .font(.system(size: isCompact ? 30 : 40))
                     .foregroundStyle(ScholarTheme.primarySoft)
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 18) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: isCompact ? 135 : 170), spacing: 12)], spacing: isCompact ? 12 : 18) {
                 PlanBenefit(title: "Up to 5 Children")
                 PlanBenefit(title: "Unlimited Practice")
                 PlanBenefit(title: "Daily AI Insights")
@@ -4182,13 +5278,13 @@ struct LSDarkPlanCard: View {
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(ScholarTheme.primary)
                     .padding(.horizontal, 26)
-                    .frame(minHeight: 54)
+                    .frame(minHeight: isCompact ? 48 : 54)
                     .background(ScholarTheme.cardBackground)
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)
         }
-        .padding(28)
+        .padding(isCompact ? 22 : 28)
         .background(
             LinearGradient(
                 colors: [ScholarTheme.darkOlive, ScholarTheme.primaryContainer.opacity(0.88)],
@@ -4202,40 +5298,45 @@ struct LSDarkPlanCard: View {
 }
 
 struct PlanBenefit: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let title: String
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         Label(title, systemImage: "checkmark.circle")
-            .font(.headline)
+            .font(isCompact ? .subheadline.weight(.semibold) : .headline)
             .foregroundStyle(Color.white.opacity(0.92))
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 struct LSProfileMenuRow: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let icon: String
     let title: String
     let subtitle: String
     let tint: Color
     var isDestructive = false
     let action: () -> Void
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 18) {
+            HStack(spacing: isCompact ? 14 : 18) {
                 Image(systemName: icon)
-                    .font(.title3.weight(.semibold))
+                    .font(isCompact ? .headline.weight(.semibold) : .title3.weight(.semibold))
                     .foregroundStyle(tint)
-                    .frame(width: 50, height: 50)
+                    .frame(width: isCompact ? 42 : 50, height: isCompact ? 42 : 50)
                     .background(tint.opacity(0.12))
                     .clipShape(Circle())
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.title3.bold())
+                        .font(isCompact ? .headline.bold() : .title3.bold())
                         .foregroundStyle(isDestructive ? ScholarTheme.error : ScholarTheme.onSurface)
                     if !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(.subheadline)
+                            .font(isCompact ? .caption.weight(.medium) : .subheadline)
                             .foregroundStyle(ScholarTheme.onSurfaceVariant)
                     }
                 }
@@ -4246,7 +5347,7 @@ struct LSProfileMenuRow: View {
                         .foregroundStyle(ScholarTheme.outline)
                 }
             }
-            .padding(24)
+            .padding(isCompact ? 18 : 24)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -4254,6 +5355,8 @@ struct LSProfileMenuRow: View {
 }
 
 struct LSProfileAvatarStrip: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     let profiles: [ChildProfile]
     @Binding var selectedChildID: UUID?
     let results: [ExamResult]
@@ -4261,25 +5364,26 @@ struct LSProfileAvatarStrip: View {
     let onEdit: (ChildProfile) -> Void
     let onDelete: (ChildProfile) -> Void
     let onAdd: () -> Void
+    private var isCompact: Bool { horizontalSizeClass == .compact }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 28) {
+            HStack(alignment: .top, spacing: isCompact ? 18 : 28) {
                 ForEach(profiles) { profile in
-                    VStack(spacing: 10) {
+                    VStack(spacing: isCompact ? 8 : 10) {
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
                                 selectedChildID = profile.profileID
                             }
                         } label: {
-                            ChildProfilePhotoBadge(avatarValue: profile.avatar, isSelected: selectedChildID == profile.profileID, size: 72)
+                            ChildProfilePhotoBadge(avatarValue: profile.avatar, isSelected: selectedChildID == profile.profileID, size: isCompact ? 58 : 72)
                         }
                         .buttonStyle(.plain)
                         Text(profile.name)
-                            .font(.headline)
+                            .font(isCompact ? .subheadline.weight(.semibold) : .headline)
                             .foregroundStyle(selectedChildID == profile.profileID ? ScholarTheme.primary : ScholarTheme.onSurface)
                             .lineLimit(1)
-                            .frame(width: 86)
+                            .frame(width: isCompact ? 72 : 86)
                     }
                     .contextMenu {
                         Button("Edit") { onEdit(profile) }
@@ -4288,18 +5392,18 @@ struct LSProfileAvatarStrip: View {
                 }
                 if canAdd {
                     Button(action: onAdd) {
-                        VStack(spacing: 10) {
+                        VStack(spacing: isCompact ? 8 : 10) {
                             Image(systemName: "plus")
-                                .font(.title.weight(.medium))
+                                .font(isCompact ? .title3.weight(.medium) : .title.weight(.medium))
                                 .foregroundStyle(ScholarTheme.primary)
-                                .frame(width: 72, height: 72)
+                                .frame(width: isCompact ? 58 : 72, height: isCompact ? 58 : 72)
                                 .background(ScholarTheme.controlSurface)
                                 .clipShape(Circle())
                                 .overlay {
                                     Circle().stroke(ScholarTheme.outlineVariant, style: StrokeStyle(lineWidth: 1.4, dash: [5, 5]))
                                 }
                             Text("Add New")
-                                .font(.headline)
+                                .font(isCompact ? .subheadline.weight(.semibold) : .headline)
                                 .foregroundStyle(ScholarTheme.onSurface)
                         }
                     }
