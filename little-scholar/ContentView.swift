@@ -849,16 +849,21 @@ enum FlexibleAnswer: Decodable {
 
     var displayValue: String {
         switch self {
-        case .string(let value): value
-        case .array(let values): values.joined(separator: ", ")
-        case .object(let object): object.values.map(\.displayValue).joined(separator: ", ")
+        case .string(let value):
+            return value
+        case .array(let values):
+            return values.joined(separator: ", ")
+        case .object(let object):
+            return object.values.map(\.displayValue).joined(separator: ", ")
         }
     }
 
     var storageValue: String {
         switch self {
-        case .string(let value): value
-        case .array(let values): encodedStringArray(values)
+        case .string(let value):
+            return value
+        case .array(let values):
+            return encodedStringArray(values)
         case .object(let object):
             if object.values.contains(where: \.isArray) {
                 return encodedStringArrayMap(object.mapValues(\.arrayStorageValue))
@@ -890,8 +895,10 @@ enum FlexibleAnswerObjectValue: Decodable {
 
     var displayValue: String {
         switch self {
-        case .string(let value): value
-        case .array(let values): values.joined(separator: ", ")
+        case .string(let value):
+            return value
+        case .array(let values):
+            return values.joined(separator: ", ")
         }
     }
 
